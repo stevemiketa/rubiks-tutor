@@ -55,7 +55,7 @@ func New(cfg Config) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
-	// Readiness gains a database check once there is a database.
+	// Readiness doesn't check the Snapshot database yet (#17).
 	mux.HandleFunc("GET /readyz", handleHealth)
 	mux.HandleFunc("POST /api/solve", handleSolve)
 
