@@ -1,5 +1,5 @@
-import { formatMove } from '../cube/index.ts'
 import { rotationFor, type RotationDirection } from '../session/index.ts'
+import { MoveButton } from './MoveButton.tsx'
 
 // Each button's name, what it shows, and the key that does the same.
 const BUTTONS: readonly { direction: RotationDirection; name: string; glyph: string; key?: string }[] = [
@@ -25,23 +25,18 @@ export function RotateControls({
       <h2 id="rotate-heading">Rotate the Cube</h2>
       <p className="muted">Shift + an arrow key, or drag the space around the Cube.</p>
       <div className="rotate-pad" role="group" aria-labelledby="rotate-heading">
-        {BUTTONS.map(({ direction, name, glyph, key }) => {
-          const move = formatMove(rotationFor(direction))
-          return (
-            <button
-              key={direction}
-              type="button"
-              className={`turn-button rotate-${direction}`}
-              aria-label={`${name}: ${move}`}
-              aria-keyshortcuts={key}
-              disabled={disabled}
-              onClick={() => onRotate(direction)}
-            >
-              <span aria-hidden="true">{glyph}</span>
-              <span className="notation">{move}</span>
-            </button>
-          )
-        })}
+        {BUTTONS.map(({ direction, name, glyph, key }) => (
+          <MoveButton
+            key={direction}
+            move={rotationFor(direction)}
+            name={name}
+            glyph={glyph}
+            className={`rotate-${direction}`}
+            keyShortcuts={key}
+            disabled={disabled}
+            onClick={() => onRotate(direction)}
+          />
+        ))}
       </div>
     </section>
   )

@@ -1,3 +1,5 @@
+// Whether the visitor has asked for reduced motion: the one place the app
+// reads the setting.
 import { useSyncExternalStore } from 'react'
 
 const QUERY = '(prefers-reduced-motion: reduce)'
@@ -8,7 +10,8 @@ function subscribe(onChange: () => void): () => void {
   return () => list.removeEventListener('change', onChange)
 }
 
-const prefersReducedMotion = (): boolean => window.matchMedia(QUERY).matches
+/** Whether the visitor has asked for reduced motion, right now. False where the browser can't say. */
+export const prefersReducedMotion = (): boolean => window.matchMedia?.(QUERY).matches ?? false
 
 /**
  * Whether the visitor has asked for reduced motion, kept current if they

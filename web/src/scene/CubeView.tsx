@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { moveAxis, type Move, type Sticker } from '../cube/index.ts'
 import { QUARTER_TURN_MS, snapRotations, type MoveQueue, type QueuedMove } from '../session/index.ts'
 import { CubeModel } from './cubeModel.ts'
+import { prefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { NoWebGL, WebGLGate } from './webgl.tsx'
 
 /** Where the fixed camera sits, looking at the Cube's center. */
@@ -87,8 +88,6 @@ function quaternionOf(move: Move): THREE.Quaternion {
   const [x, y, z] = moveAxis(move).axis
   return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(x, y, z), (-move.amount * Math.PI) / 2)
 }
-
-const prefersReducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted }: AnimatedCubeProps) {
   const model = useMemo(() => new CubeModel(), [])

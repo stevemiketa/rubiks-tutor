@@ -1,5 +1,6 @@
-import { formatMove, stickerCol, stickerFace, stickerRow, type Sticker } from '../cube/index.ts'
+import { stickerCol, stickerFace, stickerRow, type Sticker } from '../cube/index.ts'
 import { DIRECTIONS, turnFor, type Direction } from '../session/index.ts'
+import { MoveButton } from './MoveButton.tsx'
 
 const ARROWS: Readonly<Record<Direction, string>> = { up: '↑', left: '←', right: '→', down: '↓' }
 
@@ -47,26 +48,19 @@ export function TurnControls({
           arrow keys or the buttons here to turn the Layers through it.
         </p>
       ) : (
-        <>
-          <div className="turn-pad" role="group" aria-label="Turn the selected Sticker’s Layers">
-            {DIRECTIONS.map((direction) => {
-              const move = formatMove(turnFor(selected, direction))
-              return (
-                <button
-                  key={direction}
-                  type="button"
-                  className={`turn-button turn-${direction}`}
-                  aria-label={`Turn ${direction}: ${move}`}
-                  disabled={disabled}
-                  onClick={() => onTurn(direction)}
-                >
-                  <span aria-hidden="true">{ARROWS[direction]}</span>
-                  <span className="notation">{move}</span>
-                </button>
-              )
-            })}
-          </div>
-        </>
+        <div className="turn-pad" role="group" aria-label="Turn the selected Sticker’s Layers">
+          {DIRECTIONS.map((direction) => (
+            <MoveButton
+              key={direction}
+              move={turnFor(selected, direction)}
+              name={`Turn ${direction}`}
+              glyph={ARROWS[direction]}
+              className={`turn-${direction}`}
+              disabled={disabled}
+              onClick={() => onTurn(direction)}
+            />
+          ))}
+        </div>
       )}
     </section>
   )

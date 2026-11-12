@@ -17,15 +17,12 @@ import {
   type RotationDirection,
 } from './controls.ts'
 import { MoveQueue, moveDuration } from './moveQueue.ts'
-import { generateScramble } from './scramble.ts'
+import { SCRAMBLE_TURN_MS, generateScramble } from './scramble.ts'
 import { Session, type PlaybackSpeed } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
 import { snapshotApi } from './snapshotClient.ts'
 import { requestSolve, type Solver } from './solveClient.ts'
-
-/** How long a new Session's Scramble takes to play, in ms. */
-const SCRAMBLE_MS = 2000
 
 /** A hint the tutor shows: 'select-sticker' asks the learner to select a Sticker first. */
 export type Hint = 'select-sticker'
@@ -337,11 +334,7 @@ export class Tutor {
    * each Move is queued once the scene has finished showing the one before.
    */
   play(): void {
-    const { session } = this.#state
-    const playing = session.play()
-    if (playing === session) return
-    this.#update({ session: playing })
-    if (this.queue.isIdle) this.#playNext()
+    this.#startPlayback(this.#state.session.play())
   }
 
   /**
@@ -350,11 +343,7 @@ export class Tutor {
    * plays them.
    */
   reverse(): void {
-    const { session } = this.#state
-    const reversing = session.reverse()
-    if (reversing === session) return
-    this.#update({ session: reversing })
-    if (this.queue.isIdle) this.#playNext()
+    this.#startPlayback(this.#state.session.reverse())
   }
 
   /** Pauses Playback if it is playing either way, and otherwise plays it forward: what Space does. */
@@ -481,6 +470,15 @@ export class Tutor {
     this.#playback(session.playNext(), move)
   }
 
+  // Takes a Session with Playback just started one way or the other, if it
+  // changed. Its first Move is queued now if the scene is idle, and
+  // otherwise once the scene has shown what it is animating.
+  #startPlayback(session: Session): void {
+    if (session === this.#state.session) return
+    this.#update({ session })
+    if (this.queue.isIdle) this.#playNext()
+  }
+
   // Takes a Session that shows the same Cube, such as one with Playback
   // paused or at another speed, if it changed.
   #settle(session: Session): void {
@@ -540,7 +538,7 @@ export class Tutor {
       return
     }
     this.queue.jump(Cube.solved())
-    for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_MS / session.scramble.length)
+    for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_TURN_MS)
     this.#update({ ...changes, scrambling: true })
   }
 

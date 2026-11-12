@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Cube } from '../cube/index.ts'
-import { MoveQueue, moveDuration } from '../session/index.ts'
+import { MoveQueue, SCRAMBLE_TURN_MS, moveDuration } from '../session/index.ts'
 import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
-/** Each Scramble Turn's length: about two seconds for the 25, as in the tutor. */
-const SCRAMBLE_TURN_MS = 2000 / 25
 /** How much faster than the tutor's normal Playback speed the Solution plays. */
 const SOLUTION_SPEED = 1.6
 /** How long the Cube rests, in ms: before the first Scramble, once scrambled, and once solved. */
