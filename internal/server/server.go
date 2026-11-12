@@ -3,7 +3,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -23,6 +26,10 @@ type Config struct {
 	// Snapshots keeps shared Snapshots. The Snapshot API answers 503
 	// without it.
 	Snapshots snapshot.Store
+	// Ready checks that what the server depends on, such as the Snapshot
+	// database, can be reached. GET /readyz answers 503 while it returns
+	// an error. Nil means always ready.
+	Ready func(context.Context) error
 	// PublicBaseURL is where share links point, such as
 	// https://cubular.example. Empty means the address each request was
 	// sent to.
@@ -55,8 +62,7 @@ func New(cfg Config) http.Handler {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealth)
-	// Readiness doesn't check the Snapshot database yet (#17).
-	mux.HandleFunc("GET /readyz", handleHealth)
+	mux.HandleFunc("GET /readyz", readinessHandler(cfg.Ready, cfg.Logger))
 	mux.HandleFunc("POST /api/solve", handleSolve)
 
 	snapshots := &snapshotAPI{
@@ -80,6 +86,33 @@ func New(cfg Config) http.Handler {
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// readinessTimeout is how long GET /readyz waits for the readiness check
+// before answering 503. A probe should wait longer than this, so that it
+// hears the answer.
+const readinessTimeout = time.Second
+
+// readinessHandler serves GET /readyz: 200 while ready succeeds, otherwise
+// 503, with the reason logged rather than shown.
+func readinessHandler(ready func(context.Context) error, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if ready != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), readinessTimeout)
+			defer cancel()
+			if err := ready(ctx); err != nil {
+				// Drivers can report running out of time as a bad
+				// connection, so say what happened.
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					err = fmt.Errorf("no answer within %v: %w", readinessTimeout, err)
+				}
+				logger.WarnContext(r.Context(), "not ready", "err", err)
+				writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+				return
+			}
+		}
+		handleHealth(w, r)
+	}
 }
 
 // writeJSON writes v as the JSON response body with the given status.

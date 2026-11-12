@@ -15,8 +15,23 @@ concurrency:
 
 jobs:
   go:
-    name: Go tests
+    name: Go tests (store suite on SQLite and Postgres)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: cubular
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      # The Postgres tests skip without it locally, and fail without it in CI.
+      CUBULAR_TEST_POSTGRES_URL: postgres://postgres:cubular@localhost:5432/postgres?sslmode=disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
