@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PageTheme, type ThemeSetting, type ThemeStorage } from './theme.ts'
+import { PageTheme, type OsColorScheme, type ThemeSetting, type ThemeStorage } from './theme.ts'
 
 // Browser storage as the page sees it: a Map behind Storage's interface.
 class MemoryStorage {
@@ -17,7 +17,7 @@ class MemoryStorage {
 
 // The OS's color scheme as matchMedia('(prefers-color-scheme: dark)') reports
 // it, which the test can change as the learner would in their settings.
-class OsColorScheme {
+class FakeOsColorScheme implements OsColorScheme {
   matches: boolean
   readonly #listeners = new Set<() => void>()
   constructor(dark: boolean) {
@@ -41,7 +41,7 @@ const pageRoot = () => ({ dataset: {} as DOMStringMap })
 
 function open({ storage = new MemoryStorage(), osDark = false }: { storage?: ThemeStorage; osDark?: boolean } = {}) {
   const root = pageRoot()
-  const os = new OsColorScheme(osDark)
+  const os = new FakeOsColorScheme(osDark)
   return { theme: new PageTheme(storage, root, os), root, os, storage }
 }
 
@@ -122,7 +122,7 @@ describe('PageTheme', () => {
     }
     for (const storage of [undefined, refusing]) {
       const root = pageRoot()
-      const theme = new PageTheme(storage, root, new OsColorScheme(false))
+      const theme = new PageTheme(storage, root, new FakeOsColorScheme(false))
       expect(theme.setting).toBe('system')
 
       for (const setting of ['dark', 'system', 'light'] as const satisfies readonly ThemeSetting[]) {

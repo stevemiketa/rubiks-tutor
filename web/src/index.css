@@ -363,12 +363,12 @@ a {
 
 .action-button.danger {
   border-color: var(--color-danger-border);
-  background: var(--color-danger);
+  background: var(--color-surface-danger);
 }
 
 .action-button.danger:hover,
 .action-button.danger:focus-visible {
-  background: var(--color-danger-hover);
+  background: var(--color-surface-danger-hover);
 }
 
 .panel .scramble {
@@ -481,7 +481,7 @@ a {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid var(--color-caution);
+  border: 1px solid var(--color-stale-solution);
   border-radius: 0.5rem;
   background: var(--color-surface-raised);
 }
@@ -556,7 +556,7 @@ a {
    in, the Algorithm being performed, and the Move reached with its note. */
 .stage-list > li[aria-current='true']::marker,
 .stage-list > li[aria-current='true'] > .stage-name {
-  color: var(--color-link);
+  color: var(--color-current-stage);
 }
 
 .panel .stage-list .stage-goal {

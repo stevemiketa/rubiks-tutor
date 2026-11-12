@@ -265,13 +265,14 @@ const SPLASH = ['splash-1', 'splash-2', 'splash-3', 'splash-4']
 const AROUND: readonly (readonly [color: string, backgrounds: readonly string[], minimum: number])[] = [
   ['text-muted', ['bg', 'surface', 'surface-raised', 'surface-card'], TEXT],
   ['link', ['bg', 'surface', 'surface-card'], TEXT],
+  ['current-stage', ['surface'], TEXT],
   ['splash-subtitle', SPLASH, TEXT],
   ['border-control', ['bg', 'surface', 'surface-raised'], GRAPHIC],
   ['focus', ['bg', 'surface', 'surface-raised'], GRAPHIC],
   ['accent', ['bg', 'surface'], GRAPHIC],
   ['danger-border', ['surface', 'surface-raised'], GRAPHIC],
   ['warning', ['surface', 'surface-raised'], GRAPHIC],
-  ['caution', ['surface', 'surface-raised'], GRAPHIC],
+  ['stale-solution', ['surface', 'surface-raised'], GRAPHIC],
   ['hint', ['bg'], GRAPHIC],
 ]
 
@@ -322,7 +323,7 @@ describe('the color tokens', () => {
 
   // Within 2°, as near as 8-bit channels allow.
   it.each(THEMES)('keep the blue accent’s hue, 217°, in the %s theme', (theme) => {
-    for (const name of ['accent', 'accent-hover', 'link', 'focus']) {
+    for (const name of ['accent', 'accent-hover', 'link', 'current-stage', 'focus']) {
       expect(Math.abs(hue(token(name, theme)) - 217), `--color-${name}`).toBeLessThan(2)
     }
   })
