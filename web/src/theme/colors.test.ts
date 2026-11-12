@@ -113,20 +113,65 @@ interface Rule {
   readonly declarations: ReadonlyMap<string, string>
 }
 
-const RULES: readonly Rule[] = [
-  ...appCss
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/@import[^;]*;/g, '')
-    .matchAll(/([^{}]+)\{([^{}]*)\}/g),
-].map(([, selectors = '', body = '']) => ({
-  selectors: selectors.split(',').map((selector) => selector.trim()),
-  declarations: new Map(
-    body.split(';').flatMap((declaration) => {
-      const colon = declaration.indexOf(':')
-      return colon < 0 ? [] : [[declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()] as const]
-    }),
-  ),
-}))
+const rulesOf = (css: string): Rule[] =>
+  [
+    ...css
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/@import[^;]*;/g, '')
+      .matchAll(/([^{}]+)\{([^{}]*)\}/g),
+  ].map(([, selectors = '', body = '']) => ({
+    selectors: selectors.split(',').map((selector) => selector.trim()),
+    declarations: new Map(
+      body.split(';').flatMap((declaration) => {
+        const colon = declaration.indexOf(':')
+        return colon < 0 ? [] : [[declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()] as const]
+      }),
+    ),
+  }))
+
+const RULES: readonly Rule[] = rulesOf(appCss)
+
+// The colors CSS knows by name: its named colors, then its system colors.
+// transparent and currentColor aren't here, so the CSS may use them: neither
+// holds a color of its own.
+const COLOR_NAMES = [
+  ...`aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood
+    cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray
+    darkgreen darkgrey darkkhaki darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen
+    darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue dimgray dimgrey dodgerblue
+    firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow grey honeydew
+    hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan
+    lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray
+    lightslategrey lightsteelblue lightyellow lime limegreen linen magenta maroon mediumaquamarine mediumblue
+    mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen mediumturquoise mediumvioletred
+    midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid
+    palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple
+    rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue
+    slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow
+    yellowgreen`.split(/\s+/),
+  ...`AccentColor AccentColorText ActiveText ButtonBorder ButtonFace ButtonText Canvas CanvasText Field FieldText GrayText
+    Highlight HighlightText LinkText Mark MarkText SelectedItem SelectedItemText VisitedText`.split(/\s+/),
+]
+
+// A color given outright: as hex, through a color function, or by name.
+const LITERAL = new RegExp(
+  String.raw`#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(|(?<![\w-])(?:${COLOR_NAMES.join('|')})(?![\w-])`,
+  'gi',
+)
+
+/**
+ * Every color a stylesheet's rules give outright, not through a token, as
+ * "property: color". Only values count, without their quoted strings, such
+ * as grid area names, or the names of the tokens they take.
+ */
+const literalColors = (css: string): string[] =>
+  rulesOf(css).flatMap((rule) =>
+    [...rule.declarations].flatMap(([property, value]) =>
+      [...value.replace(/'[^']*'|"[^"]*"/g, '').replace(/var\(--[\w-]+/g, 'var(').matchAll(LITERAL)].map(
+        ([color]) => `${property}: ${color}`,
+      ),
+    ),
+  )
 
 /** The color tokens a value takes, by name without the prefix. */
 const tokensIn = (value: string | undefined): string[] =>
@@ -276,7 +321,7 @@ describe('the color tokens', () => {
   })
 
   // Within 2°, as near as 8-bit channels allow.
-  it.each(THEMES)('keep the blue accent at the hue of today’s #3b82f6, 217°, in the %s theme', (theme) => {
+  it.each(THEMES)('keep the blue accent’s hue, 217°, in the %s theme', (theme) => {
     for (const name of ['accent', 'accent-hover', 'link', 'focus']) {
       expect(Math.abs(hue(token(name, theme)) - 217), `--color-${name}`).toBeLessThan(2)
     }
@@ -292,11 +337,24 @@ describe('the color tokens', () => {
 })
 
 describe('the app’s CSS', () => {
-  const lines = appCss.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')
-
   it('takes every color from a color token', () => {
-    const literal = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(|\b(?:white|black)\b/i
-    expect(lines.filter((line) => literal.test(line)).map((line) => line.trim())).toEqual([])
+    expect(literalColors(appCss)).toEqual([])
+  })
+
+  it('would be caught giving a color outright: as hex, a function or a name, though transparent and currentColor are fine', () => {
+    const css = `
+      .a { color: #0b64f4; border: 1px solid Red; }
+      .b { background: linear-gradient(rgb(0 0 0 / 0.5), transparent), var(--color-bg); fill: currentColor; }
+      .c { outline: 2px solid rebeccapurple; caret-color: CanvasText; grid-template-areas: 'tan navy'; }
+      .tomato { box-shadow: 0 0 4px var(--color-gold, gold); }`
+    expect(literalColors(css)).toEqual([
+      'color: #0b64f4',
+      'border: Red',
+      'background: rgb(',
+      'outline: rebeccapurple',
+      'caret-color: CanvasText',
+      'box-shadow: gold',
+    ])
   })
 
   it('uses only color tokens that are defined', () => {
