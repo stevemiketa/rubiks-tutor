@@ -82,6 +82,15 @@ func TestSolveSkipsStagesThatAreAlreadyFinished(t *testing.T) {
 			"D", "D'", "D2", "y", "y'", "y2", "x2 F R U R' U' F' x2", "x2 R U R' U R U2 R' x2",
 			"x2 R' F R' B2 R F' R' B2 R2 x2", "x2 R U' R U R U R U' R' U' R2 x2",
 		}},
+		// Sune keeps yellow up on the edges; the A-perm and U-perm only
+		// move top Pieces round.
+		{"yellow-cross", []string{
+			"D", "D'", "D2", "y", "y'", "y2", "x2 R U R' U R U2 R' x2",
+			"x2 R' F R' B2 R F' R' B2 R2 x2", "x2 R U' R U R U R U' R' U' R2 x2",
+		}},
+		{"yellow-face", []string{"D", "D'", "D2", "y", "y'", "y2", "x2 R' F R' B2 R F' R' B2 R2 x2", "x2 R U' R U R U R U' R' U' R2 x2"}},
+		// The U-perm leaves the corners where they are.
+		{"yellow-corners", []string{"y", "y'", "y2", "x2 R U' R U R U R U' R' U' R2 x2"}},
 	} {
 		t.Run(tc.through, func(t *testing.T) {
 			timer := &solveTimer{}
@@ -189,6 +198,17 @@ func checkSolution(t *testing.T, scramble, history string, s solutionBody) {
 		if opened[cube.StickerAt(method[i].whiteOn, 1, 1)] != cube.White {
 			t.Errorf("%s: Stage %s: the white center isn't on %v after the opening Cube rotations of %q", input, st.ID, method[i].whiteOn, st.Moves)
 		}
+		// A Stage that earlier ones happen to finish does nothing, apart from
+		// the Cube rotation that puts white where the Stage wants it.
+		if finishedAnywhere(method[i], c) {
+			rotation := 0
+			if c[cube.StickerAt(method[i].whiteOn, 1, 1)] != cube.White {
+				rotation = 1
+			}
+			if len(moves) > rotation {
+				t.Errorf("%s: Stage %s is finished at its start, yet has the Moves %q", input, st.ID, st.Moves)
+			}
+		}
 		for ; j < len(moves); j++ {
 			if !inAlgorithm[j] && !method[i].setup(moves[j]) {
 				t.Errorf("%s: Stage %s: Move %d (%v) of %q is outside its Algorithms and isn't one of its setup Moves", input, st.ID, j, moves[j], st.Moves)
@@ -212,6 +232,10 @@ func checkSolution(t *testing.T, scramble, history string, s solutionBody) {
 		if !method[i].goal(c) {
 			t.Errorf("%s: the goal of Stage %s does not hold at its end: %v", input, st.ID, c)
 		}
+	}
+
+	if !c.IsSolved() {
+		t.Errorf("%s: applying the Solution's Stages %v leaves the Cube unsolved: %v", input, stageIDs(s), c)
 	}
 }
 

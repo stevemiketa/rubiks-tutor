@@ -20,7 +20,15 @@ const stepForward = (page: Page) =>
 test('each Stage of a real Solution shows its goal and a card for each Algorithm it uses', async ({ page }) => {
   await page.goto('/app')
   await solutionPanel(page).getByRole('button', { name: 'Solve' }).click()
-  await expect(stages(page)).toHaveText(['White cross', 'White corners', 'Middle layer'])
+  await expect(stages(page)).toHaveText([
+    'White cross',
+    'White corners',
+    'Middle layer',
+    'Yellow cross',
+    'Yellow face',
+    'Yellow corners',
+    'Yellow edges',
+  ])
 
   await expect(stage(page, 'White cross')).toContainText(
     'Make a white cross on top, with each edge matching the center beside it.',
@@ -29,6 +37,10 @@ test('each Stage of a real Solution shows its goal and a card for each Algorithm
   await expect(stage(page, 'Middle layer')).toContainText(
     'Flip white to the bottom, then place the four middle-layer edges.',
   )
+  await expect(stage(page, 'Yellow cross')).toContainText('Make a yellow cross on top.')
+  await expect(stage(page, 'Yellow face')).toContainText('Twist the top corners until the whole top is yellow.')
+  await expect(stage(page, 'Yellow corners')).toContainText('Move the top corners to their correct spots.')
+  await expect(stage(page, 'Yellow edges')).toContainText('Move the top edges to their correct spots to finish the Cube.')
 
   // The white cross is solved by intuition, with no Algorithms.
   await expect(cards(page, 'White cross')).toHaveCount(0)
@@ -37,6 +49,16 @@ test('each Stage of a real Solution shows its goal and a card for each Algorithm
   const inserts = await cards(page, 'Middle layer').allTextContents()
   expect(inserts.length).toBeGreaterThan(0)
   for (const card of inserts) expect(["Right insert U R U' R' U' F' U F", "Left insert U' L' U L U F U' F'"]).toContain(card)
+  // Each yellow Stage repeats one Algorithm: one card, or none when earlier
+  // Stages happen to finish it.
+  for (const [name, card] of [
+    ['Yellow cross', "Edge flip F R U R' U' F'"],
+    ['Yellow face', "Sune R U R' U R U2 R'"],
+    ['Yellow corners', "A-perm R' F R' B2 R F' R' B2 R2"],
+    ['Yellow edges', "U-perm R U' R U R U R U' R' U' R2"],
+  ] as const) {
+    expect([[], [card]]).toContainEqual(await cards(page, name).allTextContents())
+  }
 })
 
 test.describe('with a hand-written Solution', () => {
