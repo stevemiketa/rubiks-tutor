@@ -22,7 +22,7 @@ import { Session, type PlaybackSpeed } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
 import { snapshotApi } from './snapshotClient.ts'
-import { requestSolve, type Solver } from './solveClient.ts'
+import { SolveRefused, requestSolve, type Solver } from './solveClient.ts'
 
 /** A hint the tutor shows: 'select-sticker' asks the learner to select a Sticker first. */
 export type Hint = 'select-sticker'
@@ -36,10 +36,13 @@ export type Confirmation = 'new-scramble'
 /**
  * How the last Solve went: 'solving' while waiting for the solver,
  * 'already-solved' if there was nothing to solve, 'failed' if the solver
- * couldn't be reached, and 'idle' otherwise, including once a Solution is
- * loaded. 'already-solved' and 'failed' last until the learner's next Move.
+ * couldn't be reached or couldn't answer, which trying again may fix, and
+ * 'idle' otherwise, including once a Solution is loaded. When the solver
+ * refuses the Session, trying again won't help: 'too-many-moves' if it has
+ * more Moves than Solve takes, and 'rejected' for any other reason. Every
+ * status but 'idle' and 'solving' lasts until the learner's next Move.
  */
-export type SolveStatus = 'idle' | 'solving' | 'already-solved' | 'failed'
+export type SolveStatus = 'idle' | 'solving' | 'already-solved' | 'failed' | 'too-many-moves' | 'rejected'
 
 /** Everything the tutor's UI shows, as one immutable snapshot. */
 export interface TutorState {
@@ -319,8 +322,8 @@ export class Tutor {
     let result
     try {
       result = await (this.#options.solve ?? requestSolve)(scramble, history)
-    } catch {
-      this.#update({ solveStatus: 'failed' })
+    } catch (error) {
+      this.#update({ solveStatus: failedSolveStatus(error) })
       return
     }
     // Nothing else ends a Solve that is waiting, but the Cube may have changed.
@@ -562,6 +565,12 @@ export class Tutor {
     }
     for (const listener of this.#listeners) listener()
   }
+}
+
+/** How a Solve that rejected with error went: see SolveStatus. */
+function failedSolveStatus(error: unknown): SolveStatus {
+  if (!(error instanceof SolveRefused)) return 'failed'
+  return error.status === 413 ? 'too-many-moves' : 'rejected'
 }
 
 function messageOf(error: unknown): string {

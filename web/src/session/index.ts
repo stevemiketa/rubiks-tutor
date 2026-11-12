@@ -30,7 +30,7 @@ export { algorithmsOf, type Algorithm, type PerformedAlgorithm, type Teaching } 
 export { SessionStore, browserStorage, type StorageLike } from './sessionStore.ts'
 export type { Opening, SharedSnapshot, Sharing, SnapshotClient } from './sharing.ts'
 export { snapshotApi } from './snapshotClient.ts'
-export { requestSolve, type Solver } from './solveClient.ts'
+export { SolveRefused, requestSolve, type Solver } from './solveClient.ts'
 export {
   Tutor,
   type Confirmation,

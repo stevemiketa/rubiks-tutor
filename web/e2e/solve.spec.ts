@@ -94,4 +94,24 @@ test.describe('with reduced motion', () => {
     await expect(error).toBeHidden()
     await expect(stages(page)).toHaveText(METHOD)
   })
+
+  test('a Solve refused for too many Moves says why, and offers no Retry, which couldn’t help', async ({ page }) => {
+    // A Session of over 10,000 Moves takes too many key presses for a
+    // journey, so the server's answer to one (covered by the Go API tests)
+    // stands in.
+    await page.route('**/api/solve', (route) =>
+      route.fulfill({
+        status: 413,
+        json: { code: 'too-many-moves', message: 'the request has 10001 Moves; the limit is 10000' },
+      }),
+    )
+    await page.goto('/app')
+
+    await solutionPanel(page).getByRole('button', { name: 'Solve' }).click()
+
+    const error = solutionPanel(page).getByRole('alert')
+    await expect(error).toContainText('Solve can take at most 10,000 Moves')
+    await expect(error).not.toContainText('connection')
+    await expect(solutionPanel(page).getByRole('button', { name: 'Retry' })).toHaveCount(0)
+  })
 })
