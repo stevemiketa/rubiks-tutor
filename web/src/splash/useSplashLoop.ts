@@ -5,8 +5,8 @@ import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
 /**
  * The speed the Solution plays at, as a multiple of the tutor's normal
- * Playback speed: slow enough that each Turn looks smooth rather than
- * flickering. A quarter Turn takes about 469 ms and a half Turn about 703 ms.
+ * Playback speed: a little over half, slow enough that each Turn looks smooth
+ * rather than flickering.
  */
 const SOLUTION_SPEED = 1.6 / 3
 /** How long the Cube rests, in ms: before the first Scramble, once scrambled, and once solved. */
