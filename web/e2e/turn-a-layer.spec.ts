@@ -10,8 +10,12 @@ async function clickFrontCenter(page: Page): Promise<void> {
   const view = page.getByRole('img', { name: 'The Cube' })
   const box = await view.boundingBox()
   if (box === null) throw new Error('the 3D view is not visible')
-  await view.click({ position: { x: box.width * FRONT_CENTER.x, y: box.height * FRONT_CENTER.y } })
-  await expect(page.getByText('Selected: front face, center')).toBeVisible()
+  // The 3D view starts listening for clicks a moment after it appears, which
+  // takes longer on a busy machine, so a click right after loading can miss.
+  await expect(async () => {
+    await view.click({ position: { x: box.width * FRONT_CENTER.x, y: box.height * FRONT_CENTER.y } })
+    await expect(page.getByText('Selected: front face, center')).toBeVisible({ timeout: 1000 })
+  }).toPass()
 }
 
 const moveHistory = (page: Page) => page.getByRole('list', { name: 'Move history' }).getByRole('listitem')

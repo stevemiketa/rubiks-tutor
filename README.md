@@ -64,6 +64,7 @@ Logs are structured JSON on stdout, one line per request.
 | `web/src/session/` | The Session model, with no rendering code: the Session, the turning controls, the queue of Moves to animate, and `Tutor`, which the tutor page reads |
 | `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
+| `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |
 | `web/src/routing/` | Client-side routing between the splash page and the tutor |
 | `web/e2e/` | Playwright journeys |
 
