@@ -5,16 +5,27 @@ import { clickFrontCenter, moveHistory, scramble } from './tutor.ts'
 // and therefore a new Session.
 
 test('a new Session scrambles itself, and Turns wait until the Scramble finishes', async ({ page }) => {
+  // The page's clock stands still until the test lets it go, so the
+  // Scramble, which plays one animation frame at a time, is still playing
+  // when the key below is pressed, however busy the machine is. Its first
+  // Move hasn't been drawn, so the Sticker is selected from the keyboard,
+  // which needs no picture to click.
+  const start = new Date('2026-01-01T09:00:00Z')
+  await page.clock.install({ time: start })
+  await page.clock.pauseAt(new Date(start.getTime() + 1000))
   await page.goto('/app')
 
   await expect(scramble(page)).toBeVisible()
   await expect(page.getByText('Scrambling…')).toBeVisible()
-  await clickFrontCenter(page)
+  await page.keyboard.press('w')
+  await expect(page.getByText('Selected: front face, center')).toBeVisible()
   await expect(page.getByRole('button', { name: "Turn up: M'" })).toBeDisabled()
   // Ignored: the Scramble is still playing.
   await page.keyboard.press('ArrowUp')
+  await expect(page.getByText('Scrambling…')).toBeVisible()
 
-  // It plays in about two seconds.
+  // Once time runs, it plays in about two seconds.
+  await page.clock.resume()
   await expect(page.getByText('Scrambling…')).toBeHidden({ timeout: 4000 })
   await expect(page.getByRole('button', { name: "Turn up: M'" })).toBeEnabled()
   await expect(moveHistory(page)).toHaveCount(0)
