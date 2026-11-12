@@ -1,0 +1,32 @@
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { Tutor, commandForKey, type TutorState } from '../session/index.ts'
+
+/**
+ * The page's Tutor and its current state. The Tutor lives as long as the
+ * component, and the arrow keys anywhere on the page go to it.
+ */
+export function useTutor(): { tutor: Tutor; state: TutorState } {
+  const [tutor] = useState(() => new Tutor())
+  const state = useSyncExternalStore(tutor.subscribe, tutor.getState)
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isTextEntry(event.target)) return
+      // A held key repeats; only deliberate presses make Moves.
+      if (event.repeat) {
+        if (commandForKey(event) !== undefined) event.preventDefault()
+        return
+      }
+      if (tutor.press(event)) event.preventDefault()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [tutor])
+
+  return { tutor, state }
+}
+
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}

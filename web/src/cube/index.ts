@@ -19,6 +19,8 @@ export {
   COLORS,
   FACES,
   SOLVED_COLORS,
+  faceNormal,
+  moveAxis,
   relabel,
   stickerAt,
   stickerCol,
