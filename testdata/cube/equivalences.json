@@ -1,0 +1,21 @@
+{
+  "kind": "equivalences",
+  "description": "Sequences with the same effect. Applying a or b to start (a solved Cube when start is absent) must give the same state.",
+  "cases": [
+    {"name": "x turns as R does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "x", "b": "R M' L'"},
+    {"name": "y turns as U does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "y", "b": "U E' D'"},
+    {"name": "z turns as F does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "z", "b": "F S B'"},
+    {"name": "M turns as L does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "M", "b": "R L' x'"},
+    {"name": "E turns as D does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "E", "b": "U D' y'"},
+    {"name": "S turns as F does", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "S", "b": "F' B z"},
+    {"name": "four quarter Turns are no Move", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "R R R R", "b": ""},
+    {"name": "four middle Layer quarter Turns are no Move", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "M M M M", "b": ""},
+    {"name": "four quarter Cube rotations are no Move", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "x x x x", "b": ""},
+    {"name": "two quarter Turns make a half Turn", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "R R", "b": "R2"},
+    {"name": "two counterclockwise middle Layer Turns make a half Turn", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "M' M'", "b": "M2"},
+    {"name": "two quarter Cube rotations make a half turn", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "y y", "b": "y2"},
+    {"name": "three quarter Turns make a counterclockwise Turn", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "U U U", "b": "U'"},
+    {"name": "(R U R' U') six times returns to the start", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "R U R' U' R U R' U' R U R' U' R U R' U' R U R' U' R U R' U'", "b": ""},
+    {"name": "opposite Layers commute", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "a": "R L'", "b": "L' R"}
+  ]
+}

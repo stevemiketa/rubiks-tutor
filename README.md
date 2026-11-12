@@ -56,10 +56,19 @@ Logs are structured JSON on stdout, one line per request.
 |---|---|
 | `cmd/cubular/` | The server's entry point: configuration, listening, graceful shutdown |
 | `internal/server/` | The HTTP router and its tests, which drive it in-process |
+| `internal/cube/` | The Go cube model: Cube state, notation, Moves, relabeling and Pieces. Its package doc defines the Sticker layout both models share |
+| `testdata/cube/` | The shared cube test cases, which both cube models must pass |
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
+| `web/src/cube/` | The TypeScript cube model, the same as the Go one |
 | `web/src/routing/` | Client-side routing between the splash page and the tutor |
 | `web/e2e/` | Playwright journeys |
+
+## Shared cube test cases
+
+The cube model exists twice, in Go and in TypeScript ([ADR 0002](docs/adr/0002-cube-model-in-go-and-typescript.md)). Each JSON file in `testdata/cube/` holds one kind of case and describes its own fields. `make test-go` and `make test-web` each load every file, so CI fails if either model disagrees with any case. A file of an unknown kind, or a case with a missing or unknown field, fails both suites instead of being skipped.
+
+A change to Moves or notation updates both models and the case files in the same change. Take a new case's expected values from a source other than the models, such as a published pattern or a hand derivation.
 
 ## Frontend development
 

@@ -11,5 +11,9 @@ export default defineConfig({
   },
   test: {
     include: ['src/**/*.test.ts'],
+    // The shared cube cases are found with import.meta.glob, and Vitest's
+    // file-system module cache keys a module on its own content, not on the
+    // files a glob matches, so it would miss a newly added case file.
+    fsModuleCache: false,
   },
 })
