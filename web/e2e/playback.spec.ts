@@ -49,7 +49,8 @@ test('Step, the scrubber, Reverse and the speed control, with the current Move h
   await page.keyboard.press('ArrowRight')
   await page.keyboard.press('ArrowRight')
   await expect(progress(page)).toHaveText(`2 of ${total} Moves played`)
-  await expect(scrubber(page)).toHaveValue('2')
+  await page.keyboard.press('ArrowLeft')
+  await expect(scrubber(page)).toHaveValue('1')
   await expect(moveHistory(page)).toHaveCount(0)
   await expect(page.getByText('Select a Sticker first', { exact: false })).toBeHidden()
 
@@ -62,27 +63,9 @@ test('Step, the scrubber, Reverse and the speed control, with the current Move h
   await expect(button(page, 'Play')).toBeEnabled()
 })
 
-test('Space plays and pauses while a Solution is loaded', async ({ page }) => {
-  const total = (await solve(page)).length
-  await scrubber(page).focus()
-
-  await page.keyboard.press('Space')
-  await expect(button(page, 'Pause')).toBeVisible()
-  await page.keyboard.press('Space')
-  await expect(button(page, 'Play')).toBeVisible()
-  const paused = (await progress(page).textContent()) ?? ''
-  await page.waitForTimeout(800)
-  await expect(progress(page)).toHaveText(paused)
-
-  // On a focused Playback button, Space plays without also pressing the button.
-  await button(page, 'Step back').focus()
-  await page.keyboard.press('Space')
-  await expect(progress(page)).toHaveText(`${total} of ${total} Moves played`, { timeout: total * 400 + 5000 })
-})
-
-test.describe('with a Solution of two Stages', () => {
-  // The real solver's Solutions have one Stage so far, so a hand-written one
-  // with two stands in. Playback doesn't need it to solve the Cube.
+test.describe('with a Solution of two short Stages', () => {
+  // A hand-written Solution stands in for the solver's, so each journey
+  // knows where every Stage ends. Playback doesn't need it to solve the Cube.
   test.beforeEach(async ({ page }) => {
     const stage = (id: string, name: string, moves: string) => ({
       id,
@@ -115,6 +98,31 @@ test.describe('with a Solution of two Stages', () => {
     await expect(autoPause).not.toBeChecked()
     await button(page, 'Play').click()
     await expect(progress(page)).toHaveText('6 of 6 Moves played')
+  })
+
+  test('Space plays and pauses, even on a focused button, which it doesn’t press', async ({ page }) => {
+    await solve(page)
+    // Slowly, so the first Stage is still playing when Space pauses it.
+    await button(page, '0.5×').click()
+    await scrubber(page).focus()
+
+    await page.keyboard.press('Space')
+    await expect(button(page, 'Pause')).toBeVisible()
+    await page.keyboard.press('Space')
+    await expect(button(page, 'Play')).toBeVisible()
+    const paused = (await progress(page).textContent()) ?? ''
+    await page.waitForTimeout(1200)
+    await expect(progress(page)).toHaveText(paused)
+
+    await page.keyboard.press('Home')
+    await page.keyboard.press('ArrowRight')
+    await expect(progress(page)).toHaveText('1 of 6 Moves played')
+    await button(page, 'Step back').focus()
+    await page.keyboard.press('Space')
+    // Playback runs on to the end of the first Stage. Pressing Step back too
+    // would have paused it at the start instead.
+    await expect(progress(page)).toHaveText('4 of 6 Moves played')
+    await expect(button(page, 'Play')).toBeVisible()
   })
 
   test('clicking a Stage jumps to its first Move', async ({ page }) => {
