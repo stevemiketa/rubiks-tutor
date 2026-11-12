@@ -44,3 +44,185 @@ a {
 .button:focus-visible {
   background: #2563eb;
 }
+
+.muted {
+  color: #a3aab8;
+}
+
+.notation {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Tutor */
+
+.tutor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.tutor-header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.tutor-header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: #a3aab8;
+}
+
+.brand {
+  color: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.notice {
+  margin: 0;
+}
+
+.tutor-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 52rem) {
+  .tutor-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tutor-stage {
+  position: relative;
+}
+
+.cube-view {
+  /* The camera is set up for a square view. */
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: calc(100vh - 6rem);
+  margin: 0 auto;
+}
+
+.tutor-status {
+  position: absolute;
+  inset: 0 0 auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.tutor-status p {
+  margin: 0;
+}
+
+.solved {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  background: #15803d;
+  color: #fff;
+  font-weight: 700;
+}
+
+.hint:not(:empty) {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ff3fd2;
+  border-radius: 0.5rem;
+  background: #1f2937;
+}
+
+.tutor-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panel {
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #1a1d26;
+}
+
+.panel h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+.panel p {
+  margin: 0 0 0.75rem;
+}
+
+.turn-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 3.5rem);
+  grid-template-areas:
+    '. up .'
+    'left . right'
+    '. down .';
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.turn-up {
+  grid-area: up;
+}
+
+.turn-left {
+  grid-area: left;
+}
+
+.turn-right {
+  grid-area: right;
+}
+
+.turn-down {
+  grid-area: down;
+}
+
+.turn-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.5rem;
+  border: 1px solid #3a4150;
+  border-radius: 0.5rem;
+  background: #252a36;
+  color: inherit;
+  font: inherit;
+  line-height: 1.1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.turn-button:hover,
+.turn-button:focus-visible {
+  background: #313848;
+}
+
+.turn-button:active {
+  background: #3b82f6;
+}
+
+.move-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.6rem;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}

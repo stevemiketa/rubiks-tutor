@@ -142,6 +142,17 @@ const AXES: Readonly<Record<Letter, { axis: Vec; depth: 1 | 0 | 'all' }>> = {
   z: { axis: [0, 0, 1], depth: 'all' },
 }
 
+/**
+ * What a Move turns, for drawing it (TypeScript only): the axis it turns
+ * clockwise around, as seen looking at the origin from the axis's tip, and
+ * which Pieces along that axis move. depth is the position along the axis of
+ * the Layer that turns (1 for an outer Layer, 0 for a middle one), or 'all'
+ * for a Cube rotation.
+ */
+export function moveAxis(move: Move): { readonly axis: Vec; readonly depth: 1 | 0 | 'all' } {
+  return AXES[move.letter]
+}
+
 /** Where each Sticker goes: the Sticker at index i moves to perm[i]. */
 export type Perm = readonly Sticker[]
 
