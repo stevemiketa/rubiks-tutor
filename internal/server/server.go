@@ -110,6 +110,10 @@ func apiErrors(mux *http.ServeMux) http.Handler {
 		// redirect to a cleaned path. See which, without its plain-text body.
 		probe := &statusProbe{header: http.Header{}}
 		h.ServeHTTP(probe, r)
+		if probe.status == http.StatusNotFound || probe.status == http.StatusMethodNotAllowed {
+			// A later version may answer here, so don't cache.
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		switch probe.status {
 		case http.StatusNotFound:
 			writeError(w, &apiError{status: http.StatusNotFound, Code: "not-found", Message: "the API has no " + r.URL.Path})

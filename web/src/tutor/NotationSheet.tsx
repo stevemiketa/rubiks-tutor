@@ -83,7 +83,10 @@ export function NotationSheet() {
           <h3>Keys</h3>
           <dl className="terms keys">
             <Key keys="← → ↑ ↓">Turn the Layers through the selected Sticker, the way the arrow points.</Key>
-            <Key keys="W A S D">Move the selection up, left, down or right, across the front, top and right faces.</Key>
+            <Key keys="W A S D">
+              Select a Sticker without a mouse: the first press selects the front face’s center, and then each moves
+              the selection up, left, down or right, across the front, top and right faces.
+            </Key>
             <Key keys="Esc">Clear the selection.</Key>
             <Key keys="Shift + ← →">
               Rotate the Cube left (<N>y</N>) or right (<N>y'</N>).
@@ -91,9 +94,11 @@ export function NotationSheet() {
             <Key keys="Shift + ↑ ↓">
               Rotate the Cube up (<N>x</N>) or down (<N>x'</N>).
             </Key>
-            <Key keys="Ctrl+Z or ⌘Z">Undo the last Move.</Key>
-            <Key keys="Shift+Ctrl+Z or Shift+⌘Z">Redo it.</Key>
+            <Key keys="Ctrl+Z or ⌘Z">Undo the last Move, or Step back while a Solution is loaded.</Key>
+            <Key keys="Shift+Ctrl+Z or Shift+⌘Z">Redo it, or Step forward while a Solution is loaded.</Key>
+            <Key keys="Space">Play or pause the loaded Solution.</Key>
           </dl>
+          <p>Holding a key down makes one Move, not a stream of them: press it again for each Move.</p>
         </div>
       </dialog>
     </>

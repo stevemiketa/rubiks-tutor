@@ -51,10 +51,37 @@ The server reads its configuration from environment variables:
 | `DATABASE_URL` | `sqlite:cubular.db` | Where Snapshots are stored. `sqlite:<path>` is a SQLite file, created if missing; the path is relative to the working directory unless it starts with `/`, as in `sqlite:///var/lib/cubular/cubular.db`. A `postgres://` or `postgresql://` URL is a Postgres database, as in `postgres://cubular:<password>@db.example:5432/cubular?sslmode=require`; production uses Postgres so that replicas can share it. Migrations run at startup, one process at a time, and `GET /readyz` answers 503 while the database can't be reached, after waiting at most a second for it |
 | `PUBLIC_BASE_URL` | the request's own address | Where share links point, such as `https://cubular.example`. Set it in production. Without it the server logs a warning at startup and builds each link from the address the request was sent to: for a request from a trusted proxy, the scheme and host in the proxy's `X-Forwarded-Proto` and `X-Forwarded-Host`, and otherwise the request's own, which is fine for local development |
 | `TRUSTED_PROXIES` | none | Comma-separated CIDR ranges or addresses whose forwarding headers are believed: `X-Forwarded-For` when rate limiting, and `X-Forwarded-Proto` and `X-Forwarded-Host` for share links when `PUBLIC_BASE_URL` is unset. Requests from anywhere else count as coming from their connection's address, to the address they were sent to |
-| `SHARE_LIMIT_PER_HOUR` | `30` | How many Snapshots one client may share an hour, per replica. IPv6 clients are counted per /64 |
+| `SHARE_LIMIT_PER_HOUR` | `30` | How many Snapshots one client may share an hour, per replica. A client is an IPv4 address, or an IPv6 /64: one IPv6 client is usually given a whole /64, so counting single IPv6 addresses would let it share from a fresh address every time |
 | `SHARE_LIMIT_BURST` | `10` | How many Snapshots one client may share at once |
 
-Logs are structured JSON on stdout, one line per request.
+Logs are structured JSON on stdout, one line per request, plus a few at startup.
+
+## HTTP caching
+
+| Response | `Cache-Control` | Why |
+|---|---|---|
+| The entry page (`/`, `/app`, `/s/{id}`) | `no-store` | It names the current hashed assets |
+| `/assets/*` | `public, max-age=31536000, immutable` | Vite puts a content hash in every name |
+| `GET /api/snapshots/{id}`, found | `public, max-age=31536000, immutable` | A Snapshot never changes ([ADR 0003](docs/adr/0003-server-stored-snapshots.md)), so browsers and shared caches may keep it for a year. The spec only sets caching for assets and the entry page; this follows from Snapshots being immutable |
+| `GET /api/snapshots/{id}`, not found or failed | `no-store` | That ID may be shared later |
+| `POST /api/snapshots`, and API answers for unknown paths or methods | `no-store` | |
+
+API errors are JSON with a machine-readable `code` and a readable `message`, including 404 for an unknown `/api/` path and 405, with `Allow`, for a method a route doesn't take. Unknown page paths get a plain 404.
+
+## Tutor keys
+
+The keys follow spec #3's control table and its "Other keys", plus W, A, S and D, which the spec doesn't list:
+
+| Keys | What they do |
+|---|---|
+| ← → ↑ ↓ | Turn the Layers through the selected Sticker |
+| Shift + ← → ↑ ↓ | Rotate the Cube: `y`, `y'`, `x`, `x'` |
+| W A S D | Move the selection up, left, down or right across the front, top and right faces; with nothing selected, select the front face's center. Added so that every action, selecting a Sticker included, can be done from the keyboard (story 69) |
+| Esc | Clear the selection |
+| Ctrl/⌘+Z, Shift+Ctrl/⌘+Z | Undo and redo; Step back and Step forward while a Solution is loaded |
+| Space | Play or pause, while a Solution is loaded |
+
+A held key makes one Move: the browser's key repeat is ignored, so holding an arrow doesn't keep turning a Layer. The spec doesn't say either way. The tutor leaves keys alone while a text field or a modal dialog (such as the cheat sheet) has them, and a focused slider keeps its own arrow keys. `commandForKey` in `web/src/session/controls.ts` maps keys to commands, and `web/src/tutor/useTutor.ts` listens for them. The notation cheat sheet (`web/src/tutor/NotationSheet.tsx`) lists the same keys for learners, so change both together.
 
 ## Snapshots and the store suite
 

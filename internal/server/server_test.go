@@ -202,6 +202,10 @@ func TestTheAPIAnswersUnknownPathsAndMethodsWithAJSONError(t *testing.T) {
 			if got := res.Header.Get("Allow"); got != tc.allow {
 				t.Errorf("Allow %q, want %q", got, tc.allow)
 			}
+			// A route added later may answer here, so don't cache.
+			if got := res.Header.Get("Cache-Control"); got != "no-store" {
+				t.Errorf("Cache-Control %q, want no-store", got)
+			}
 			if e := decode[apiError](t, res); e.Code != tc.code || e.Message == "" {
 				t.Errorf("error %+v, want code %s and a message", e, tc.code)
 			}
