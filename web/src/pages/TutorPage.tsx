@@ -2,6 +2,7 @@ import { Link } from '../routing/Link.tsx'
 import { CubeView } from '../scene/CubeView.tsx'
 import { isSelectable } from '../session/index.ts'
 import { MoveHistory } from '../tutor/MoveHistory.tsx'
+import { ScramblePanel } from '../tutor/ScramblePanel.tsx'
 import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useTutor } from '../tutor/useTutor.ts'
 
@@ -32,6 +33,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
           />
           <div className="tutor-status">
             <p role="status">{solved && <span className="solved">Solved</span>}</p>
+            <p role="status">{state.scrambling && <span className="scrambling">Scrambling…</span>}</p>
             <p role="status" className="hint">
               {state.hint === 'select-sticker' && 'Select a Sticker first: click one on the front, top or right face.'}
             </p>
@@ -39,7 +41,19 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
         </div>
 
         <div className="tutor-panel">
-          <TurnControls selected={state.selected} onTurn={(direction) => tutor.turn(direction)} />
+          <ScramblePanel
+            scramble={state.session.scramble}
+            confirming={state.confirming === 'new-scramble'}
+            movesMade={state.session.history.length}
+            onNewScramble={() => tutor.newScramble()}
+            onConfirm={() => tutor.confirmNewScramble()}
+            onCancel={() => tutor.cancelNewScramble()}
+          />
+          <TurnControls
+            selected={state.selected}
+            disabled={state.scrambling}
+            onTurn={(direction) => tutor.turn(direction)}
+          />
           <MoveHistory moves={state.session.history} />
         </div>
       </div>
