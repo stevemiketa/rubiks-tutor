@@ -4,6 +4,7 @@
 // animation in progress) lives in Tutor.
 import { Cube, formatMoves, inverse, invert, parseMoves, type Move } from '../cube/index.ts'
 import { stageStarts, type Solution } from './solution.ts'
+import { teachingAt, type Teaching } from './teaching.ts'
 
 // Everything a Session holds, as plain data. Add new parts of a Session here,
 // give them a starting value in Session.start and a codec in CODECS, and
@@ -233,6 +234,16 @@ export class Session {
   get previousMove(): Move | undefined {
     const loaded = this.#fields.solution
     return loaded === undefined || loaded.position === 0 ? undefined : loaded.solution.moves[loaded.position - 1]
+  }
+
+  /**
+   * What Playback teaches at its position in the loaded Solution: the Stage,
+   * the Move reached with its note, and the Algorithm being performed.
+   * Undefined with no Solution loaded, or one with no Stages.
+   */
+  get teaching(): Teaching | undefined {
+    const loaded = this.#fields.solution
+    return loaded && teachingAt(loaded.solution, loaded.position)
   }
 
   /** Whether the Cube is solved: every face a single color, in any orientation. */

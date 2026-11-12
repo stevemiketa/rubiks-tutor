@@ -490,6 +490,67 @@ a {
   margin: 0.25rem 0 0;
 }
 
+/* Teaching each Stage: its goal and Algorithm cards, the Stage Playback is
+   in, the Algorithm being performed, and the Move reached with its note. */
+.stage-list > li[aria-current='true']::marker,
+.stage-list > li[aria-current='true'] > .stage-name {
+  color: #8ab4ff;
+}
+
+.panel .stage-list .stage-goal {
+  color: #a3aab8;
+  font-size: 0.875rem;
+}
+
+.algorithm-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.algorithm-card {
+  display: flex;
+  flex-direction: column;
+  padding: 0.3rem 0.55rem;
+  border: 1px solid #3a4150;
+  border-radius: 0.5rem;
+  background: #20242f;
+  font-size: 0.875rem;
+}
+
+.algorithm-name {
+  font-weight: 600;
+}
+
+.algorithm-card[aria-current='true'] {
+  border-color: #f59e0b;
+  background: #2c2617;
+}
+
+.algorithm-moves .performing {
+  border-radius: 0.2rem;
+  background: #f59e0b;
+  color: #11131a;
+}
+
+.panel .reached-move {
+  margin: 0 0 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid #3b82f6;
+  border-radius: 0.25rem;
+  background: #20242f;
+}
+
+/* Still there for screen readers, so the first note is announced. */
+.panel .reached-move:empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .playback {
   display: flex;
   flex-direction: column;
