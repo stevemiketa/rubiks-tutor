@@ -1,0 +1,1 @@
+`vite build` writes the frontend to `site/` here, and `web/embed.go` embeds it into the Go binary. This file is committed so `go:embed` has something to match before the first build. Don't edit `site/`; it's generated and ignored by git.
