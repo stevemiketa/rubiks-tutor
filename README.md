@@ -49,8 +49,8 @@ The server reads its configuration from environment variables:
 |---|---|---|
 | `PORT` | `8080` | TCP port to listen on; `0` picks a free one |
 | `DATABASE_URL` | `sqlite:cubular.db` | Where Snapshots are stored. `sqlite:<path>` is a SQLite file, created if missing; the path is relative to the working directory unless it starts with `/`, as in `sqlite:///var/lib/cubular/cubular.db`. A `postgres://` or `postgresql://` URL is a Postgres database, as in `postgres://cubular:<password>@db.example:5432/cubular?sslmode=require`; production uses Postgres so that replicas can share it. Migrations run at startup, one process at a time, and `GET /readyz` answers 503 while the database can't be reached, after waiting at most a second for it |
-| `PUBLIC_BASE_URL` | the request's own address | Where share links point, such as `https://cubular.example` |
-| `TRUSTED_PROXIES` | none | Comma-separated CIDR ranges or addresses whose `X-Forwarded-For` headers are believed when rate limiting. Requests from anywhere else count as coming from their connection's address |
+| `PUBLIC_BASE_URL` | the request's own address | Where share links point, such as `https://cubular.example`. Set it in production. Without it the server logs a warning at startup and builds each link from the address the request was sent to: for a request from a trusted proxy, the scheme and host in the proxy's `X-Forwarded-Proto` and `X-Forwarded-Host`, and otherwise the request's own, which is fine for local development |
+| `TRUSTED_PROXIES` | none | Comma-separated CIDR ranges or addresses whose forwarding headers are believed: `X-Forwarded-For` when rate limiting, and `X-Forwarded-Proto` and `X-Forwarded-Host` for share links when `PUBLIC_BASE_URL` is unset. Requests from anywhere else count as coming from their connection's address, to the address they were sent to |
 | `SHARE_LIMIT_PER_HOUR` | `30` | How many Snapshots one client may share an hour, per replica. IPv6 clients are counted per /64 |
 | `SHARE_LIMIT_BURST` | `10` | How many Snapshots one client may share at once |
 

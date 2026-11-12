@@ -148,16 +148,20 @@ func TestEachRequestIsLoggedAsJSON(t *testing.T) {
 	get(t, h, "/app")
 	get(t, h, "/nope")
 
+	// Every line is JSON. Startup can log too, such as a warning about the
+	// configuration, so only the request lines are counted.
 	var lines []map[string]any
 	for line := range strings.Lines(logs.String()) {
 		var entry map[string]any
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			t.Fatalf("log line is not JSON: %q", line)
 		}
-		lines = append(lines, entry)
+		if entry["msg"] == "request" {
+			lines = append(lines, entry)
+		}
 	}
 	if len(lines) != 2 {
-		t.Fatalf("got %d log lines, want 2:\n%s", len(lines), logs.String())
+		t.Fatalf("got %d request log lines, want 2:\n%s", len(lines), logs.String())
 	}
 	for i, want := range []struct {
 		path   string

@@ -33,14 +33,18 @@ type Config struct {
 	Ready func(context.Context) error
 	// PublicBaseURL is where share links point, such as
 	// https://cubular.example. Empty means the address each request was
-	// sent to.
+	// sent to, as a trusted proxy's X-Forwarded-Proto and X-Forwarded-Host
+	// report it, and New logs a warning, since that suits only local
+	// development.
 	PublicBaseURL string
 	// ShareLimit is how often one client may share. Fields left at zero
 	// take DefaultShareLimit's values.
 	ShareLimit RateLimit
-	// TrustedProxies are the address ranges whose X-Forwarded-For headers
-	// are believed when working out a client's address. Requests from
-	// anywhere else are taken to come from their connection's address.
+	// TrustedProxies are the address ranges whose forwarding headers are
+	// believed: X-Forwarded-For when working out a client's address, and
+	// X-Forwarded-Proto and X-Forwarded-Host for share links without a
+	// PublicBaseURL. Requests from anywhere else are taken to come from
+	// their connection's address, to the address they were sent to.
 	TrustedProxies []netip.Prefix
 	// Now tells the time for rate limiting. Nil means time.Now.
 	Now func() time.Time
@@ -66,9 +70,14 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /readyz", readinessHandler(cfg.Ready, cfg.Logger))
 	mux.HandleFunc("POST /api/solve", handleSolve)
 
+	if cfg.PublicBaseURL == "" {
+		cfg.Logger.Warn("PUBLIC_BASE_URL is not set, so share links point to the address each request was sent to: " +
+			"set it in production, or behind a proxy set TRUSTED_PROXIES so its X-Forwarded-Proto and X-Forwarded-Host are believed")
+	}
 	snapshots := &snapshotAPI{
 		store:     cfg.Snapshots,
 		baseURL:   cfg.PublicBaseURL,
+		trusted:   cfg.TrustedProxies,
 		limiter:   newRateLimiter(cfg.ShareLimit),
 		clientKey: func(r *http.Request) netip.Prefix { return rateLimitKey(clientAddr(r, cfg.TrustedProxies)) },
 		now:       cfg.Now,
