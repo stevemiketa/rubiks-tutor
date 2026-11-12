@@ -17,7 +17,7 @@ import (
 var middleEdges = stageSpec{
 	id:   "middle-edges",
 	name: "Middle layer",
-	goal: "Flip white to the bottom, then place the four middle-layer edges.",
+	goal: "Rotate the Cube so white is on the bottom, then place the four middle-layer edges.",
 	pieces: pieceNamesWhere(func(name string) bool {
 		return strings.HasSuffix(name, " edge") && !strings.Contains(name, "white") && !strings.Contains(name, "yellow")
 	}),

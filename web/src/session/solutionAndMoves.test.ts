@@ -65,7 +65,7 @@ const recorded = solutionOf({
     {
       id: 'middle-edges',
       name: 'Middle layer',
-      goal: 'Flip white to the bottom, then place the four middle-layer edges.',
+      goal: 'Rotate the Cube so white is on the bottom, then place the four middle-layer edges.',
       moves: "x2 y2 U' L' U L U F U' F'",
       notes: [
         { at: 0, text: 'turn the Cube over so the white center is on the bottom' },

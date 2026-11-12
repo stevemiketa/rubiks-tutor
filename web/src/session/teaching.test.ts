@@ -46,7 +46,7 @@ const handWritten = solutionOf({
     {
       id: 'middle-edges',
       name: 'Middle layer',
-      goal: 'Flip white to the bottom, then place the four middle-layer edges.',
+      goal: 'Rotate the Cube so white is on the bottom, then place the four middle-layer edges.',
       moves: "x2 U U R U' R' U' F' U F U' L' U L U F U' F'",
       notes: [
         { at: 0, text: 'turn the Cube over so the white center is on the bottom' },
@@ -92,7 +92,7 @@ const recordedBody = {
     {
       id: 'middle-edges',
       name: 'Middle layer',
-      goal: 'Flip white to the bottom, then place the four middle-layer edges.',
+      goal: 'Rotate the Cube so white is on the bottom, then place the four middle-layer edges.',
       moves: "x2 U2 U' L' U L U F U' F' y U2 U R U' R' U' F' U F y2 U2 U' L' U L U F U' F'",
       notes: [
         { at: 0, text: 'turn the Cube over so the white center is on the bottom' },
@@ -170,7 +170,7 @@ describe('Session.teaching', () => {
     [31, ['Left insert', 7]],
   ])('at position %i, the Algorithm being performed and which of its Moves is %j', (position, expected) => {
     const algorithm = at(handWritten, position).teaching?.algorithm
-    expect(algorithm && [algorithm.name, algorithm.step]).toEqual(expected)
+    expect(algorithm && [algorithm.name, algorithm.moveIndex]).toEqual(expected)
   })
 
   it('reaches every Move of a recorded Solution as part of an Algorithm or with a note, never both', () => {
@@ -181,7 +181,7 @@ describe('Session.teaching', () => {
       if (move === undefined) throw new Error(`no Move reached at ${position}`)
       if (algorithm !== undefined) {
         inAlgorithm++
-        expect(formatMoves(algorithm.moves.slice(algorithm.step, algorithm.step + 1))).toBe(formatMove(move.move))
+        expect(formatMoves(algorithm.moves.slice(algorithm.moveIndex, algorithm.moveIndex + 1))).toBe(formatMove(move.move))
         expect(move.note).toBeUndefined()
       } else {
         noted++

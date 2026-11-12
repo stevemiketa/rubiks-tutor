@@ -19,7 +19,7 @@ export interface Teaching {
    */
   readonly move: SolutionMove | undefined
   /** The Algorithm being performed, if that Move is part of one. */
-  readonly algorithm: AlgorithmStep | undefined
+  readonly algorithm: PerformedAlgorithm | undefined
 }
 
 /** An Algorithm as a Stage's card shows it: its name and its Moves. */
@@ -28,9 +28,10 @@ export interface Algorithm {
   readonly moves: readonly Move[]
 }
 
-/** A Move of an Algorithm: which Algorithm, and which of its Moves (0 for the first). */
-export interface AlgorithmStep extends Algorithm {
-  readonly step: number
+/** The Algorithm being performed, and how far into it Playback is. */
+export interface PerformedAlgorithm extends Algorithm {
+  /** Which of its Moves the Cube made last: 0 for the first. */
+  readonly moveIndex: number
 }
 
 /**
@@ -61,7 +62,7 @@ export function teachingAt(solution: Solution, position: number): Teaching | und
     const move = stage.moves[index]
     if (move === undefined) continue
     const use = stage.algorithms.find((a) => a.start <= index && index < a.start + a.moves.length)
-    const algorithm = use && { name: use.name, moves: use.moves, step: index - use.start }
+    const algorithm = use && { name: use.name, moves: use.moves, moveIndex: index - use.start }
     return { stage, move, algorithm }
   }
   return { stage: first, move: undefined, algorithm: undefined }

@@ -96,7 +96,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               moves={session.history}
               canUndo={session.canUndo && !waiting}
               canRedo={session.canRedo && !waiting}
-              stepsSolution={session.playable}
+              solutionPlayable={session.playable}
               onUndo={() => tutor.undo()}
               onRedo={() => tutor.redo()}
             />

@@ -209,7 +209,7 @@ const RELABELED: ReadonlyMap<number, readonly Move[]> = (() => {
   const table = new Map<number, Move[]>()
   for (const r of ALL_MOVES.filter(isRotation)) {
     const row = ALL_MOVES.map((m) => {
-      const effect = [inverse(r), m, r].reduce<readonly Sticker[]>((s, step) => permute(s, movePerm(step)), STICKERS)
+      const effect = [inverse(r), m, r].reduce<readonly Sticker[]>((s, move) => permute(s, movePerm(move)), STICKERS)
       const relabeled = byEffect.get(effect.join(','))
       if (relabeled === undefined) throw new Error(`no Move relabels ${JSON.stringify(m)}`)
       return relabeled
@@ -221,7 +221,7 @@ const RELABELED: ReadonlyMap<number, readonly Move[]> = (() => {
 
 /**
  * The Move that does physically what a Move did, once the Cube has been
- * reoriented by a Cube rotation: applying move then rotation gives the same
+ * rotated by a Cube rotation: applying move then rotation gives the same
  * Cube as applying rotation then relabel(move, rotation). For example, F
  * relabeled through y is L, because y brings the front Layer to the left.
  * Throws if rotation is not a Cube rotation.

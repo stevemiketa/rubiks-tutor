@@ -63,9 +63,9 @@ func Invert(moves []Move) []Move {
 // Turn.
 func (m Move) IsRotation() bool { return m.Letter == 'x' || m.Letter == 'y' || m.Letter == 'z' }
 
-// Relabel returns the Move that does physically what m did, once the Cube has
-// been reoriented by rotation: applying m then rotation gives the same Cube
-// as applying rotation then m.Relabel(rotation). For example, F relabeled
+// Relabel returns the Move that does physically what m did, once the Cube
+// rotation rotation has been made: applying m then rotation gives the same
+// Cube as applying rotation then m.Relabel(rotation). For example, F relabeled
 // through y is L, because y brings the front Layer to the left. It panics if
 // rotation is not a Cube rotation.
 func (m Move) Relabel(rotation Move) Move {

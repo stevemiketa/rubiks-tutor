@@ -1,6 +1,6 @@
 {
   "kind": "relabel",
-  "description": "Relabeling a Move through a Cube rotation so it does the same thing physically once the Cube is reoriented. Each Move in moves, relabeled through rotation, must give the Move at the same place in relabeled. Physically: applying the Move then rotation to start must give the same state as applying rotation then the relabeled Move.",
+  "description": "Relabeling a Move through a Cube rotation so it does the same thing physically once the Cube is rotated. Each Move in moves, relabeled through rotation, must give the Move at the same place in relabeled. Physically: applying the Move then rotation to start must give the same state as applying rotation then the relabeled Move.",
   "cases": [
     {"name": "through x", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "rotation": "x", "moves": "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2 M M' M2 E E' E2 S S' S2 x x' x2 y y' y2 z z' z2", "relabeled": "R R' R2 L L' L2 B B' B2 F F' F2 U U' U2 D D' D2 M M' M2 S S' S2 E' E E2 x x' x2 z' z z2 y y' y2"},
     {"name": "through x'", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "rotation": "x'", "moves": "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2 M M' M2 E E' E2 S S' S2 x x' x2 y y' y2 z z' z2", "relabeled": "R R' R2 L L' L2 F F' F2 B B' B2 D D' D2 U U' U2 M M' M2 S' S S2 E E' E2 x x' x2 z z' z2 y' y y2"},

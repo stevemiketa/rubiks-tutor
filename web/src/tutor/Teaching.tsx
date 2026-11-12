@@ -31,7 +31,7 @@ export function AlgorithmCards({ stage, teaching }: { stage: Stage; teaching: Te
                 // Each item is only a Move's notation, so the index is a fine key.
                 <Fragment key={i}>
                   {i > 0 && ' '}
-                  <span className={current && performing.step === i ? 'performing' : undefined}>{formatMove(move)}</span>
+                  <span className={current && performing.moveIndex === i ? 'performing' : undefined}>{formatMove(move)}</span>
                 </Fragment>
               ))}
             </span>
@@ -51,7 +51,7 @@ export function ReachedMove({ teaching }: { teaching: Teaching | undefined }) {
   const move = teaching?.move
   const algorithm = teaching?.algorithm
   const about =
-    algorithm !== undefined ? `${algorithm.name}, Move ${algorithm.step + 1} of ${algorithm.moves.length}` : move?.note
+    algorithm !== undefined ? `${algorithm.name}, Move ${algorithm.moveIndex + 1} of ${algorithm.moves.length}` : move?.note
   return (
     <p className="reached-move" role="status">
       {move !== undefined && <span className="notation">{formatMove(move.move)}</span>}
