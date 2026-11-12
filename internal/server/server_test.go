@@ -173,6 +173,38 @@ func TestEachRequestIsLoggedAsJSON(t *testing.T) {
 	}
 }
 
+func TestTheAPIAnswersUnknownPathsAndMethodsWithAJSONError(t *testing.T) {
+	for _, tc := range []struct {
+		method, path string
+		status       int
+		code, allow  string
+	}{
+		{method: "GET", path: "/api/nope", status: 404, code: "not-found"},
+		{method: "GET", path: "/api/", status: 404, code: "not-found"},
+		{method: "POST", path: "/api/solve/extra", status: 404, code: "not-found"},
+		{method: "GET", path: "/api/snapshots/Ab3_x-9QzK/extra", status: 404, code: "not-found"},
+		{method: "GET", path: "/api/solve", status: 405, code: "method-not-allowed", allow: "POST"},
+		{method: "GET", path: "/api/snapshots", status: 405, code: "method-not-allowed", allow: "POST"},
+		{method: "DELETE", path: "/api/snapshots/Ab3_x-9QzK", status: 405, code: "method-not-allowed", allow: "GET, HEAD"},
+	} {
+		t.Run(tc.method+" "+tc.path, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			newTestServer(t).ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+			res := rec.Result()
+
+			if res.StatusCode != tc.status {
+				t.Errorf("status %d, want %d", res.StatusCode, tc.status)
+			}
+			if got := res.Header.Get("Allow"); got != tc.allow {
+				t.Errorf("Allow %q, want %q", got, tc.allow)
+			}
+			if e := decode[apiError](t, res); e.Code != tc.code || e.Message == "" {
+				t.Errorf("error %+v, want code %s and a message", e, tc.code)
+			}
+		})
+	}
+}
+
 func TestUnknownPathsAreNotFound(t *testing.T) {
 	for _, path := range []string{"/nope", "/app/extra", "/s/", "/assets/", "/assets/missing-0000.js"} {
 		t.Run(path, func(t *testing.T) {

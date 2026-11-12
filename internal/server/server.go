@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"strings"
 	"time"
 
 	"github.com/stevemiketa/rubiks-tutor/internal/snapshot"
@@ -81,7 +82,59 @@ func New(cfg Config) http.Handler {
 	mux.Handle("GET /app", entryPage)
 	mux.Handle("GET /s/{id}", entryPage)
 	mux.Handle("GET /assets/{path...}", assetHandler(cfg.Frontend))
-	return logRequests(cfg.Logger, mux)
+	return logRequests(cfg.Logger, apiErrors(mux))
+}
+
+// apiErrors answers an /api/ request that no route takes with the API's
+// JSON error body: 404 for a path the API doesn't have, and 405, with the
+// Allow header, for a method its route doesn't take. Every other request,
+// including unknown page paths, which keep the plain 404, goes to mux as it
+// is.
+func apiErrors(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h, pattern := mux.Handler(r)
+		if pattern != "" || !strings.HasPrefix(r.URL.Path, "/api/") {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		// With no pattern, the mux would answer 404 or 405 itself, or
+		// redirect to a cleaned path. See which, without its plain-text body.
+		probe := &statusProbe{header: http.Header{}}
+		h.ServeHTTP(probe, r)
+		switch probe.status {
+		case http.StatusNotFound:
+			writeError(w, &apiError{status: http.StatusNotFound, Code: "not-found", Message: "the API has no " + r.URL.Path})
+		case http.StatusMethodNotAllowed:
+			w.Header().Set("Allow", probe.header.Get("Allow"))
+			writeError(w, &apiError{
+				status:  http.StatusMethodNotAllowed,
+				Code:    "method-not-allowed",
+				Message: fmt.Sprintf("%s doesn't take %s; it takes %s", r.URL.Path, r.Method, probe.header.Get("Allow")),
+			})
+		default:
+			h.ServeHTTP(w, r)
+		}
+	})
+}
+
+// statusProbe is a ResponseWriter that keeps only the status and the
+// headers it is given.
+type statusProbe struct {
+	header http.Header
+	status int
+}
+
+func (p *statusProbe) Header() http.Header { return p.header }
+
+func (p *statusProbe) WriteHeader(status int) {
+	if p.status == 0 {
+		p.status = status
+	}
+}
+
+func (p *statusProbe) Write(b []byte) (int, error) {
+	p.WriteHeader(http.StatusOK)
+	return len(b), nil
 }
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
