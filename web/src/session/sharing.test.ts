@@ -120,6 +120,25 @@ describe('Tutor.share', () => {
     expect(tutor.getState().snapshotId).toBe('id1')
   })
 
+  it('shares the Cube as it is mid-Playback: the Moves played from the Solution, but not the Solution', async () => {
+    const server = fakeServer()
+    const solveRU = () =>
+      Promise.resolve(
+        parseSolveResponse({
+          solved: false,
+          stages: [{ id: 'white-cross', name: 'White cross', goal: 'g', moves: "U' R'", notes: [], algorithms: [], pieces: [] }],
+        }),
+      )
+    const tutor = new Tutor(Session.start(parseMoves('R U')), { snapshots: server.client, solve: solveRU })
+    await tutor.solve()
+    tutor.stepForward()
+
+    void tutor.share()
+    await server.settle()
+
+    expect(server.shared).toEqual([{ scramble: 'R U', moves: "U'" }])
+  })
+
   it('shares once at a time', async () => {
     const { tutor, server } = sharingTutor()
 

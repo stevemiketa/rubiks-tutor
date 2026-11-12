@@ -2,8 +2,8 @@
 // any, with the position Playback has reached in it. It is the state that is
 // saved and shared; what is on screen right now (the selection, a hint, the
 // animation in progress) lives in Tutor.
-import { Cube, formatMoves, inverse, invert, parseMoves, type Move } from '../cube/index.ts'
-import { stageStarts, type Solution } from './solution.ts'
+import { Cube, formatMoves, inverse, invert, isRotation, parseMoves, type Move } from '../cube/index.ts'
+import { insertRotation, readSolution, stageStarts, writeSolution, type Solution } from './solution.ts'
 
 // Everything a Session holds, as plain data. Add new parts of a Session here,
 // give them a starting value in Session.start and a codec in CODECS, and
@@ -45,6 +45,12 @@ interface LoadedSolution {
   readonly speed: PlaybackSpeed
   /** Whether Playback pauses by itself at the end of each Stage. */
   readonly autoPause: boolean
+  /**
+   * Whether a manual Turn has changed the Cube since Solve, so the Solution
+   * no longer fits it. A stale Solution stays loaded to show its Stages, but
+   * has nothing to play: its Moves played went into the Move history.
+   */
+  readonly stale: boolean
 }
 
 /**
@@ -52,7 +58,7 @@ interface LoadedSolution {
  * Fields or changes how it is saved: data saved in any other version is
  * outdated, and restoring it starts a new Session instead.
  */
-const SAVED_VERSION = 2
+const SAVED_VERSION = 3
 
 /** A Session as plain data, ready for JSON: the format saved in browser storage. */
 export type SavedSession = { readonly version: number } & { readonly [K in keyof Fields]: unknown }
@@ -82,11 +88,37 @@ const moves: Codec<readonly Move[]> = {
 }
 
 /**
- * The loaded Solution isn't saved yet. toJSON saves the Cube as it is, with
- * the Moves played in the Move history, so a restored Session has the same
- * Cube and no Solution loaded.
+ * The loaded Solution is saved with its Stages as POST /api/solve gives them,
+ * and with where Playback is in it, or as null when there is none. Playback
+ * restores paused: a reload stops it.
  */
-const notSaved: Codec<Fields['solution']> = { write: () => undefined, read: () => undefined }
+const loadedSolution: Codec<Fields['solution']> = {
+  write: (loaded) =>
+    loaded === undefined
+      ? null
+      : {
+          stages: writeSolution(loaded.solution),
+          position: loaded.position,
+          speed: loaded.speed,
+          autoPause: loaded.autoPause,
+          stale: loaded.stale,
+        },
+  read: (data) => {
+    if (data === null) return undefined
+    if (typeof data !== 'object') throw new TypeError('a loaded Solution is saved as an object')
+    const saved = data as Partial<Record<string, unknown>>
+    const solution = readSolution(saved.stages)
+    const { position, speed, autoPause, stale } = saved
+    if (typeof position !== 'number' || !Number.isInteger(position) || position < 0 || position > solution.moves.length) {
+      throw new TypeError('the position Playback is at is not in the Solution')
+    }
+    if (!PLAYBACK_SPEEDS.includes(speed as PlaybackSpeed)) throw new TypeError('the Playback speed is not one of the speeds')
+    if (typeof autoPause !== 'boolean' || typeof stale !== 'boolean') throw new TypeError('the Playback settings are not true or false')
+    // A stale Solution's Moves played are in the Move history.
+    if (stale && position !== 0) throw new TypeError('a stale Solution has no Moves played')
+    return { solution, position, direction: undefined, speed: speed as PlaybackSpeed, autoPause, stale }
+  },
+}
 
 // One codec per field. The type requires every field to have one, so a new
 // field can't be left out of what is saved.
@@ -94,7 +126,7 @@ const CODECS: { readonly [K in keyof Fields]: Codec<Fields[K]> } = {
   scramble: moves,
   history: moves,
   undone: moves,
-  solution: notSaved,
+  solution: loadedSolution,
 }
 const FIELD_NAMES = Object.keys(CODECS) as (keyof Fields)[]
 
@@ -152,16 +184,17 @@ export class Session {
 
   /**
    * The Snapshot that sharing this Session saves: the Scramble and the Move
-   * history. Undone Moves are left out. This is the one place that decides
-   * what a Snapshot holds.
+   * history, with the Moves played from a loaded Solution after it, so it
+   * shows the Cube as it is now. Undone Moves and the Solution itself are
+   * left out. This is the one place that decides what a Snapshot holds.
    */
   toSnapshot(): Snapshot {
-    return { scramble: formatMoves(this.scramble), moves: formatMoves(this.history) }
+    return { scramble: formatMoves(this.scramble), moves: formatMoves(this.closeSolution().history) }
   }
 
   /** The Session as plain data, in the versioned format that restore reads. JSON.stringify calls it. */
   toJSON(): SavedSession {
-    const fields = this.closeSolution().#fields
+    const fields = this.#fields
     const saved: Record<string, unknown> = { version: SAVED_VERSION }
     for (const name of FIELD_NAMES) saved[name] = write(name, fields)
     return saved as SavedSession
@@ -181,16 +214,29 @@ export class Session {
   }
 
   /**
-   * Whether there is a Move to undo: one in the Move history, or one played
-   * from the loaded Solution. Undo never goes back past the Scramble.
+   * Whether there is a Move to undo: one in the Move history, or, while a
+   * Solution is loaded and not stale, one played from it. Undo never goes
+   * back past the Scramble.
    */
   get canUndo(): boolean {
-    return this.history.length > 0 || this.position > 0
+    return this.#playable === undefined ? this.history.length > 0 : this.previousMove !== undefined
   }
 
-  /** Whether there is a Move to redo. Playing a Solution's Moves makes new Moves, so it clears the redo stack. */
+  /**
+   * Whether there is a Move to redo: one undone, or, while a Solution is
+   * loaded and not stale, one left to play from it.
+   */
   get canRedo(): boolean {
-    return this.undone.length > 0 && this.position === 0
+    return this.#playable === undefined ? this.undone.length > 0 : this.nextMove !== undefined
+  }
+
+  /**
+   * How many Moves the learner has made since the Scramble, which a new
+   * Session would lose: those in the Move history, those undone (redo could
+   * bring them back), and those played from the loaded Solution.
+   */
+  get movesMade(): number {
+    return this.history.length + this.undone.length + this.position
   }
 
   /** The loaded Solution, if any. */
@@ -218,20 +264,25 @@ export class Session {
     return this.#fields.solution?.speed ?? 1
   }
 
+  /** Whether the loaded Solution is stale: a manual Turn changed the Cube since Solve. */
+  get stale(): boolean {
+    return this.#fields.solution?.stale ?? false
+  }
+
   /** Whether Playback pauses by itself at the end of each Stage. On unless the learner turns it off. */
   get autoPause(): boolean {
     return this.#fields.solution?.autoPause ?? true
   }
 
-  /** The loaded Solution's next Move to play, if there is one. */
+  /** The loaded Solution's next Move to play, if there is one. A stale Solution has none. */
   get nextMove(): Move | undefined {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     return loaded?.solution.moves[loaded.position]
   }
 
-  /** The last Move played from the loaded Solution: the one Step back takes back. */
+  /** The last Move played from the loaded Solution: the one Step back takes back. A stale Solution has none. */
   get previousMove(): Move | undefined {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     return loaded === undefined || loaded.position === 0 ? undefined : loaded.solution.moves[loaded.position - 1]
   }
 
@@ -241,32 +292,54 @@ export class Session {
   }
 
   /**
-   * The Session after the learner makes a Move: a Turn or a Cube rotation. A
-   * new Move clears the redo stack, and closes a loaded Solution first.
+   * The Session after the learner makes a Move: a Turn or a Cube rotation.
+   * It joins the Move history and clears the redo stack, except while a
+   * Solution is loaded and not stale:
+   * - A Cube rotation goes into the Solution where Playback is, as a Move
+   *   played, and every Move after it is relabeled, so the Solution still
+   *   solves the Cube. Playback going backward pauses, since it would take
+   *   the rotation straight back.
+   * - A Turn makes the Solution stale: the Moves played from it join the
+   *   Move history first, then the Turn.
    */
   move(move: Move): Session {
-    const s = this.closeSolution()
-    return s.#with({ history: [...s.history, move], undone: [] }, s.cube.apply([move]))
+    const loaded = this.#playable
+    const cube = this.cube.apply([move])
+    if (loaded !== undefined && !isRotation(move)) {
+      const s = this.closeSolution()
+      const stale = { ...loaded, position: 0, direction: undefined, stale: true }
+      return s.#with({ history: [...s.history, move], undone: [], solution: stale }, cube)
+    }
+    // A Solution with no Stages has nowhere to put a rotation, and nothing to relabel.
+    const solution = loaded && insertRotation(loaded.solution, loaded.position, move)
+    if (loaded !== undefined && solution !== undefined) {
+      const direction = loaded.direction === 'backward' ? undefined : loaded.direction
+      return this.#with({ solution: { ...loaded, solution, position: loaded.position + 1, direction } }, cube)
+    }
+    return this.#with({ history: [...this.history, move], undone: [] }, cube)
   }
 
   /**
    * The Session with its last Move undone, or this Session if there is none.
-   * A loaded Solution is closed first, so undo takes back the last Move played.
+   * While a Solution is loaded and not stale, undo is Step back.
    */
   undo(): Session {
-    const s = this.closeSolution()
-    const last = s.history.at(-1)
+    if (this.#playable !== undefined) return this.stepBack()
+    const last = this.history.at(-1)
     if (last === undefined) return this
-    return s.#with({ history: s.history.slice(0, -1), undone: [...s.undone, last] }, s.cube.apply([inverse(last)]))
+    return this.#with({ history: this.history.slice(0, -1), undone: [...this.undone, last] }, this.cube.apply([inverse(last)]))
   }
 
-  /** The Session with the last undone Move made again, or this Session if there is none. Closes a loaded Solution. */
+  /**
+   * The Session with the last undone Move made again, or this Session if
+   * there is none. While a Solution is loaded and not stale, redo is Step
+   * forward.
+   */
   redo(): Session {
-    if (!this.canRedo) return this
-    const s = this.closeSolution()
-    const next = s.undone.at(-1)
+    if (this.#playable !== undefined) return this.stepForward()
+    const next = this.undone.at(-1)
     if (next === undefined) return this
-    return s.#with({ history: [...s.history, next], undone: s.undone.slice(0, -1) }, s.cube.apply([next]))
+    return this.#with({ history: [...this.history, next], undone: this.undone.slice(0, -1) }, this.cube.apply([next]))
   }
 
   /**
@@ -276,12 +349,14 @@ export class Session {
    */
   loadSolution(solution: Solution): Session {
     const { speed, autoPause } = this
-    return this.closeSolution().#with({ solution: { solution, position: 0, direction: undefined, speed, autoPause } })
+    return this.closeSolution().#with({
+      solution: { solution, position: 0, direction: undefined, speed, autoPause, stale: false },
+    })
   }
 
-  /** Starts Playback forward from the current position. Does nothing with no Move left to play. */
+  /** Starts Playback forward from the current position. Does nothing with no Move left to play, or a stale Solution. */
   play(): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined || loaded.direction === 'forward' || this.nextMove === undefined) return this
     return this.#with({ solution: { ...loaded, direction: 'forward' } })
   }
@@ -291,7 +366,7 @@ export class Session {
    * it was before Solve. Does nothing at the start.
    */
   reverse(): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined || loaded.direction === 'backward' || this.previousMove === undefined) return this
     return this.#with({ solution: { ...loaded, direction: 'backward' } })
   }
@@ -312,7 +387,7 @@ export class Session {
    * Session while paused.
    */
   playNext(): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded?.direction === undefined) return this
     const { solution } = loaded
     const position = loaded.position + (loaded.direction === 'forward' ? 1 : -1)
@@ -326,10 +401,10 @@ export class Session {
    * Scrubs to a position in the loaded Solution: the Cube shows its Moves up
    * to there, and Playback pauses. Throws a RangeError for a position that
    * isn't in the Solution (0 to its number of Moves). Returns this Session
-   * with no Solution loaded.
+   * with no Solution loaded, or a stale one.
    */
   seek(position: number): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined) return this
     if (!Number.isInteger(position) || position < 0 || position > loaded.solution.moves.length) {
       throw new RangeError(`position ${position} isn't in a Solution of ${loaded.solution.moves.length} Moves`)
@@ -340,10 +415,10 @@ export class Session {
   /**
    * Jumps to the first Move of one of the loaded Solution's Stages, by its
    * index in Stage order, and pauses. Throws a RangeError for a Stage it
-   * doesn't have. Returns this Session with no Solution loaded.
+   * doesn't have. Returns this Session with no Solution loaded, or a stale one.
    */
   jumpToStage(index: number): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined) return this
     const start = stageStarts(loaded.solution)[index]
     if (start === undefined) throw new RangeError(`the Solution has no Stage ${index}`)
@@ -369,7 +444,7 @@ export class Session {
    * Returns this Session if there is none.
    */
   stepForward(): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined || this.nextMove === undefined) return this
     return this.#at(loaded, loaded.position + 1, undefined)
   }
@@ -379,7 +454,7 @@ export class Session {
    * loaded Solution. Returns this Session if none has been played.
    */
   stepBack(): Session {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     if (loaded === undefined || this.previousMove === undefined) return this
     return this.#at(loaded, loaded.position - 1, undefined)
   }
@@ -406,6 +481,12 @@ export class Session {
         ? this.cube.apply(moves.slice(loaded.position, position))
         : this.cube.apply(invert(moves.slice(position, loaded.position)))
     return this.#with({ solution: { ...loaded, position, direction } }, cube)
+  }
+
+  // The loaded Solution, if Playback can play it: it isn't stale.
+  get #playable(): LoadedSolution | undefined {
+    const loaded = this.#fields.solution
+    return loaded?.stale ? undefined : loaded
   }
 
   #with(changes: Partial<Fields>, cube: Cube = this.cube): Session {

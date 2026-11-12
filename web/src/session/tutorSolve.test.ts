@@ -231,17 +231,41 @@ describe('Tutor Playback', () => {
     expect(tutor.getState().session.position).toBe(9)
   })
 
-  it('closes the Solution when the learner makes a Move, keeping the Moves played in the Move history', async () => {
+  it('plays on through a Cube rotation the learner makes, with the Moves after it relabeled', async () => {
     const tutor = await solved()
     tutor.play()
     tutor.queue.finish(tutor.queue.current!)
 
     tutor.rotate('left')
+    // The rotation shows once the Move animating now finishes.
+    expect(queued(tutor.queue)).toBe('B2 y')
     playAll(tutor.queue)
 
     const { session } = tutor.getState()
-    expect(session.solution).toBeUndefined()
-    expect(formatMoves(session.history)).toBe('M x U B2 y')
+    expect(formatMoves(session.history)).toBe('M x')
+    // y brings the right Layer to the front, the back to the right and the left to the back.
+    expect(formatMoves(session.solution?.moves ?? [])).toBe("U B2 y F' D' R2 U R U' B")
+    expect(session.position).toBe(10)
+    expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
+    const top = [stickerAt('U', 0, 1), stickerAt('U', 1, 0), stickerAt('U', 1, 1), stickerAt('U', 1, 2), stickerAt('U', 2, 1)]
+    expect(top.map((s) => session.cube.at(s))).toEqual(['white', 'white', 'white', 'white', 'white'])
+  })
+
+  it('stops Playback when the learner turns a Layer, which makes the Solution stale', async () => {
+    const tutor = await solved()
+    tutor.play()
+    tutor.queue.finish(tutor.queue.current!)
+
+    tutor.select(stickerAt('F', 1, 1))
+    tutor.turn('up')
+    expect(queued(tutor.queue)).toBe("B2 M'")
+    playAll(tutor.queue)
+
+    const { session } = tutor.getState()
+    expect(session.stale).toBe(true)
+    expect(session.playing).toBe(false)
+    expect(formatMoves(session.history)).toBe("M x U B2 M'")
+    expect(tutor.queue.isIdle).toBe(true)
     expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
   })
 
