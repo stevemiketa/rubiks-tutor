@@ -244,6 +244,20 @@ describe('undo and redo while a Solution is loaded', () => {
   })
 })
 
+// Hand-written, for the Cube "R U F" makes: the solver skips a Stage only
+// while every earlier one is finished too, so a Stage an earlier one
+// finished comes back with no Moves, and the last Stage may be one.
+const withEmptyStages = solutionOf({
+  solved: false,
+  stages: [
+    { id: 'yellow-cross', name: 'Yellow cross', goal: 'g', moves: "F' U'", notes: [], algorithms: [], pieces: [] },
+    { id: 'yellow-face', name: 'Yellow face', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
+    { id: 'yellow-corners', name: 'Yellow corners', goal: 'g', moves: "R'", notes: [], algorithms: [], pieces: [] },
+    { id: 'yellow-edges', name: 'Yellow edges', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
+  ],
+})
+const emptyStagesLoaded = () => Session.start(parseMoves('R U F')).loadSolution(withEmptyStages)
+
 describe('a Cube rotation while a Solution is loaded', () => {
   it('goes into the Solution where Playback is, and every later Move is relabeled for the new orientation', () => {
     const atEndOfCross = steps(loaded(), 4)
@@ -339,19 +353,6 @@ describe('a Cube rotation while a Solution is loaded', () => {
     expect(rotated.position).toBe(7)
   })
 
-  // Hand-written, for the Cube "R U F" makes: a Stage an earlier one
-  // finished has no Moves, and the last Stage may be one.
-  const withEmptyStages = solutionOf({
-    solved: false,
-    stages: [
-      { id: 'yellow-cross', name: 'Yellow cross', goal: 'g', moves: "F' U'", notes: [], algorithms: [], pieces: [] },
-      { id: 'yellow-face', name: 'Yellow face', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
-      { id: 'yellow-corners', name: 'Yellow corners', goal: 'g', moves: "R'", notes: [], algorithms: [], pieces: [] },
-      { id: 'yellow-edges', name: 'Yellow edges', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
-    ],
-  })
-  const emptyStagesLoaded = () => Session.start(parseMoves('R U F')).loadSolution(withEmptyStages)
-
   it('goes into the Stage of the last Move played, never a Stage with no Moves', () => {
     const atBoundary = steps(emptyStagesLoaded(), 2).move(move('y'))
     expect(stageMoves(atBoundary)).toEqual(["F' U' y", '', "F'", ''])
@@ -369,6 +370,28 @@ describe('a Cube rotation while a Solution is loaded', () => {
     expect(formatMoves(rotated.history)).toBe('y')
     expect(rotated.solution).toBe(empty)
     expect(rotated.stale).toBe(false)
+  })
+})
+
+describe('Stages with no Moves', () => {
+  it('jumping to one goes where it would start, the end of the Stage before, which stays the Stage taught', () => {
+    const middle = emptyStagesLoaded().jumpToStage(1)
+    expect(middle.position).toBe(2)
+    expect(middle.teaching?.stage.id).toBe('yellow-cross')
+
+    const last = emptyStagesLoaded().jumpToStage(3)
+    expect(last.position).toBe(3)
+    expect(last.isSolved()).toBe(true)
+    expect(last.teaching?.stage.id).toBe('yellow-corners')
+  })
+
+  it('Playback with auto-pause stops once where an empty Stage starts and ends, then at the end', () => {
+    const atBoundary = emptyStagesLoaded().play().playNext().playNext()
+    expect([atBoundary.position, atBoundary.playing]).toEqual([2, false])
+
+    const atEnd = atBoundary.play().playNext()
+    expect([atEnd.position, atEnd.playing]).toEqual([3, false])
+    expect(atEnd.isSolved()).toBe(true)
   })
 })
 
