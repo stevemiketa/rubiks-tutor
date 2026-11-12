@@ -2,11 +2,10 @@ import { useId } from 'react'
 import type { ThemeSetting } from '../theme/theme.ts'
 import { useThemeSetting } from '../theme/useTheme.ts'
 
-const SETTINGS: readonly (readonly [ThemeSetting, string])[] = [
-  ['system', 'System'],
-  ['light', 'Light'],
-  ['dark', 'Dark'],
-]
+/** Each Theme setting's name, in the order the control lists them. */
+const LABELS: Readonly<Record<ThemeSetting, string>> = { system: 'System', light: 'Light', dark: 'Dark' }
+
+const isSetting = (value: string): value is ThemeSetting => Object.hasOwn(LABELS, value)
 
 /**
  * The Theme control: System follows the OS; Light or Dark overrides it in
@@ -22,11 +21,11 @@ export function ThemeControl() {
         id={id}
         value={setting}
         onChange={(event) => {
-          const chosen = SETTINGS.find(([value]) => value === event.currentTarget.value)
-          if (chosen !== undefined) choose(chosen[0])
+          const chosen = event.currentTarget.value
+          if (isSetting(chosen)) choose(chosen)
         }}
       >
-        {SETTINGS.map(([value, label]) => (
+        {Object.entries(LABELS).map(([value, label]) => (
           <option key={value} value={value}>
             {label}
           </option>

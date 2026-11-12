@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest'
 import appCss from '../index.css?raw'
 import { PLASTIC } from '../scene/look.ts'
 import tokensCss from './colors.css?raw'
+import type { Theme } from './theme.ts'
 
-type Theme = 'light' | 'dark'
 const THEMES: readonly Theme[] = ['light', 'dark']
 
 /** A color as sRGB channels, 0 to 255, and alpha, 0 to 1. */
