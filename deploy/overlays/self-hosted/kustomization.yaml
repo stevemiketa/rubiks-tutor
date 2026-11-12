@@ -1,0 +1,26 @@
+# Cubular on the self-hosted cluster: the base plus an Ingress with TLS.
+# Before applying it, fill in the values marked "Fill in" here and in
+# ingress.yaml; ../../README.md explains each one.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  - ingress.yaml
+
+images:
+  - name: ghcr.io/stevemiketa/rubiks-tutor
+    # Fill in: the commit SHA of the master build to run. CI publishes one
+    # image per push to master, tagged with its full commit SHA.
+    newTag: COMMIT_SHA
+
+configMapGenerator:
+  - name: cubular
+    behavior: merge
+    literals:
+      # Fill in: https:// and the Ingress host, so share links point there.
+      - PUBLIC_BASE_URL=https://cubular.example.com
+      # Fill in: the CIDR range the ingress controller connects to Cubular
+      # from, usually its Pods' range, so that rate limiting believes the
+      # client address the controller puts in X-Forwarded-For.
+      - TRUSTED_PROXIES=10.42.0.0/16

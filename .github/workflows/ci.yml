@@ -53,6 +53,17 @@ jobs:
       - run: make typecheck
       - run: make test-web
 
+  manifests:
+    name: Kubernetes manifests build and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The Makefile pins kustomize and kubeconform, and runs them with go run.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: make check-manifests
+
   e2e:
     name: Playwright against the built binary
     runs-on: ubuntu-latest

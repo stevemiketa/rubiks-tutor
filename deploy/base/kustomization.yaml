@@ -1,0 +1,19 @@
+# Cubular on any Kubernetes cluster: the Deployment and its Service. An
+# overlay adds the way in (see ../overlays/self-hosted) and the image tag.
+# Postgres isn't here: the operator provides it, through the
+# cubular-database Secret (see ../README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+# The server's configuration, apart from DATABASE_URL, which is secret, and
+# PORT, which is fixed in the Deployment. kustomize names the ConfigMap after
+# its contents, so changing a value rolls the Pods.
+configMapGenerator:
+  - name: cubular
+    literals:
+      - SHARE_LIMIT_PER_HOUR=30
+      - SHARE_LIMIT_BURST=10

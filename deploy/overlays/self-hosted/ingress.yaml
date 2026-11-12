@@ -1,0 +1,28 @@
+# HTTPS in front of the cubular Service, through the cluster's default
+# IngressClass (set spec.ingressClassName to use another).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: cubular
+  labels:
+    app.kubernetes.io/name: cubular
+spec:
+  tls:
+    - hosts:
+        # Fill in: the host, the same as in rules below.
+        - cubular.example.com
+      # Fill in: the Secret, of type kubernetes.io/tls, holding the host's
+      # certificate and key.
+      secretName: cubular-tls
+  rules:
+    # Fill in: the host Cubular is served on.
+    - host: cubular.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: cubular
+                port:
+                  name: http
