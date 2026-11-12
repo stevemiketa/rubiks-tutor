@@ -1,17 +1,15 @@
 // The page's theme for React: one PageTheme over this browser's storage, the
 // page's root element and the OS's color scheme.
 import { useSyncExternalStore } from 'react'
-import { browserStorage } from '../session/index.ts'
+import { browserStorage } from '../storage/browserStorage.ts'
 import { PageTheme, type Theme, type ThemeSetting } from './theme.ts'
+
+const QUERY = '(prefers-color-scheme: dark)'
 
 let page: PageTheme | undefined
 
 function pageTheme(): PageTheme {
-  page ??= new PageTheme(
-    browserStorage(),
-    document.documentElement,
-    window.matchMedia?.('(prefers-color-scheme: dark)'),
-  )
+  page ??= new PageTheme(browserStorage(), document.documentElement, window.matchMedia?.(QUERY))
   return page
 }
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { shareButton, shareDialog } from './tutor.ts'
 
 const themeControl = (page: Page) => page.getByRole('combobox', { name: 'Theme' })
 
@@ -59,10 +60,9 @@ test.describe('with the browser set to light', () => {
   test('a share link doesn’t carry the theme: its recipient sees their own', async ({ page, browser }) => {
     await page.goto('/app')
     await themeControl(page).selectOption('Dark')
-    const share = page.getByRole('button', { name: 'Share', exact: true })
-    await expect(share).toBeEnabled()
-    await share.click()
-    const link = page.getByRole('dialog', { name: 'Share this Cube' }).getByRole('textbox', { name: 'Share link' })
+    await expect(shareButton(page)).toBeEnabled()
+    await shareButton(page).click()
+    const link = shareDialog(page).getByRole('textbox', { name: 'Share link' })
     await expect(link).toHaveValue(/\/s\/[\w-]{10}$/)
 
     const recipientContext = await browser.newContext({ colorScheme: 'light', reducedMotion: 'reduce' })

@@ -1,21 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { formatMoves, parseMoves } from '../cube/index.ts'
+import { MemoryStorage } from '../storage/memoryStorage.ts'
 import { Session, SessionStore, type StorageLike } from './index.ts'
-
-// Browser storage as the tutor sees it: a Map behind Storage's interface.
-class MemoryStorage {
-  readonly items = new Map<string, string>()
-  /** The one thing saved, or undefined if nothing is. */
-  get saved(): string | undefined {
-    return [...this.items.values()][0]
-  }
-  getItem(key: string): string | null {
-    return this.items.get(key) ?? null
-  }
-  setItem(key: string, value: string): void {
-    this.items.set(key, value)
-  }
-}
 
 function play(session: Session, notation: string): Session {
   return parseMoves(notation).reduce((s, move) => s.move(move), session)

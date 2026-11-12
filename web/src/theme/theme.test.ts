@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { MemoryStorage } from '../storage/memoryStorage.ts'
 import { PageTheme, type OsColorScheme, type ThemeSetting, type ThemeStorage } from './theme.ts'
-
-// Browser storage as the page sees it: a Map behind Storage's interface.
-class MemoryStorage {
-  readonly items = new Map<string, string>()
-  getItem(key: string): string | null {
-    return this.items.get(key) ?? null
-  }
-  setItem(key: string, value: string): void {
-    this.items.set(key, value)
-  }
-  removeItem(key: string): void {
-    this.items.delete(key)
-  }
-}
 
 // The OS's color scheme as matchMedia('(prefers-color-scheme: dark)') reports
 // it, which the test can change as the learner would in their settings.

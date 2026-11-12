@@ -32,6 +32,12 @@ export const moveHistory = (page: Page): Locator =>
 export const scramble = (page: Page): Locator =>
   page.getByRole('region', { name: 'Scramble' }).getByText(/^(?:[RLUDFB][2']? ){24}[RLUDFB][2']?$/)
 
+/** The Share button in the tutor's header. It waits for the Scramble to finish. */
+export const shareButton = (page: Page): Locator => page.getByRole('button', { name: 'Share', exact: true })
+
+/** The dialog Share opens: the share link, and Copy link. */
+export const shareDialog = (page: Page): Locator => page.getByRole('dialog', { name: 'Share this Cube' })
+
 /** The Solution panel: the Solve button, the Stage list and Playback. */
 export const solutionPanel = (page: Page): Locator => page.getByRole('region', { name: 'Solution' })
 
