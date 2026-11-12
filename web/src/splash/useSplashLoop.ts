@@ -5,10 +5,10 @@ import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
 /**
  * The speed the Solution plays at, as a multiple of the tutor's normal
- * Playback speed: a little over half, slow enough that each Turn looks smooth
- * rather than flickering.
+ * Playback speed: a little under two thirds, slow enough that each Turn looks
+ * smooth rather than flickering.
  */
-const SOLUTION_SPEED = 1.6 / 3
+const SOLUTION_SPEED = 0.64
 /** How long the Cube rests, in ms: before the first Scramble, once scrambled, and once solved. */
 const REST_MS = { start: 800, scrambled: 1200, solved: 2500 }
 
