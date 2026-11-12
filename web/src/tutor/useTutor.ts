@@ -8,19 +8,24 @@ import { SessionStore, Tutor, browserStorage, commandForKey, type TutorState } f
  * text fields and while a modal dialog (such as the notation cheat sheet) is
  * open, which keeps Esc and the arrows for itself. It restores the Session
  * saved in browser storage, or starts a new one, and saves the Session after
- * every change.
+ * every change. Opened from a share link, it opens that link's Snapshot
+ * instead; snapshotId is read only when the page first appears.
  */
-export function useTutor(): { tutor: Tutor; state: TutorState } {
+export function useTutor(snapshotId?: string): { tutor: Tutor; state: TutorState } {
   // StrictMode calls this twice in development and keeps the first Tutor. The
-  // second finds the Session the first saved, so the two agree.
+  // second finds the Session the first saved, or loads the same Snapshot, so
+  // the two agree.
   const [tutor] = useState(() =>
-    Tutor.open({
-      store: new SessionStore(browserStorage()),
-      // Without WebGL nothing animates the queue, so the Scramble is applied
-      // at once, and so is every Move after it.
-      reducedMotion: () => prefersReducedMotion() || !canRenderWebGL(),
-      animates: canRenderWebGL,
-    }),
+    Tutor.open(
+      {
+        store: new SessionStore(browserStorage()),
+        // Without WebGL nothing animates the queue, so the Scramble is applied
+        // at once, and so is every Move after it.
+        reducedMotion: () => prefersReducedMotion() || !canRenderWebGL(),
+        animates: canRenderWebGL,
+      },
+      snapshotId,
+    ),
   )
   const state = useSyncExternalStore(tutor.subscribe, tutor.getState)
 

@@ -15,7 +15,8 @@ const startupTimeoutMs = 10_000
  * The binary gets PORT=0, so the OS picks a free port, and the address comes
  * from its "listening" log line. That way any number of suites can run at
  * once without colliding. It runs in an empty temporary directory, which also
- * proves it needs nothing from the repo at runtime.
+ * proves it needs nothing from the repo at runtime, and keeps its SQLite
+ * database there.
  *
  * Set CUBULAR_BIN to test another binary, CUBULAR_BASE_URL to skip starting
  * one, and CUBULAR_E2E_LOGS=1 to see the server's logs.
@@ -31,7 +32,14 @@ export default async function globalSetup(): Promise<(() => Promise<void>) | und
   const workDir = await mkdtemp(path.join(tmpdir(), 'cubular-e2e-'))
   const server = spawn(bin, [], {
     cwd: workDir,
-    env: { ...process.env, PORT: '0' },
+    env: {
+      ...process.env,
+      PORT: '0',
+      // Snapshots go in a fresh SQLite file, removed with the directory.
+      DATABASE_URL: `sqlite:${path.join(workDir, 'cubular.db')}`,
+      // Every journey shares from 127.0.0.1; don't let them use up its limit.
+      SHARE_LIMIT_BURST: '1000',
+    },
     stdio: ['ignore', 'pipe', 'inherit'],
   })
 
