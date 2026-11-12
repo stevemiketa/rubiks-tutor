@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MoveQueue, moveDuration } from '../session/index.ts'
 import { SPLASH_SOLUTION, SPLASH_START } from './recording.ts'
 
@@ -10,18 +10,19 @@ import { SPLASH_SOLUTION, SPLASH_START } from './recording.ts'
 const SOLUTION_SPEED = 0.64
 /** How long the Cube rests, in ms: once scrambled, and once solved. */
 const REST_MS = { scrambled: 1200, solved: 2500 }
-/** How long the Cube takes to fade out, and again to fade back in, in ms. */
-export const FADE_MS = 300
 
 /**
- * Plays the splash recording on queue over and over, until the returned
- * function stops it. Each pass starts on the scrambled Cube, rests, plays the
- * Solution and rests on the solved Cube. Then setFaded fades the Cube out,
- * the scrambled Cube replaces it with no animation while it's invisible, and
- * setFaded fades it back in, so the loop never visibly jumps. The first pass
- * starts shown, with no fade-in of its own.
+ * Plays the splash recording on queue, which starts on SPLASH_START, over and
+ * over until the returned function stops it. Each pass holds the scrambled
+ * Cube still, plays the Solution and rests on the solved Cube. Then fade fades
+ * the Cube out, the scrambled Cube replaces it with no animation once it's
+ * invisible, and fade fades it back in, so the loop never visibly jumps. fade
+ * calls then once the Cube has finished fading, and the loop waits for that
+ * rather than timing the fade itself. The first pass starts shown, with no
+ * fade-in of its own.
  */
-export function playSplashLoop(queue: MoveQueue, setFaded: (faded: boolean) => void): () => void {
+export function playSplashLoop(queue: MoveQueue, fade: (faded: boolean, then: () => void) => void): () => void {
+  let stopped = false
   let solving = false
   let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -29,14 +30,16 @@ export function playSplashLoop(queue: MoveQueue, setFaded: (faded: boolean) => v
     solving = true
     for (const move of SPLASH_SOLUTION) queue.enqueue(move, moveDuration(move, SOLUTION_SPEED))
   }
-  const fadeOut = () => {
-    setFaded(true)
-    timer = setTimeout(fadeIn, FADE_MS)
+  // Every pass starts here, with the scrambled Cube shown.
+  const startPass = () => {
+    if (stopped) return
+    timer = setTimeout(solve, REST_MS.scrambled)
   }
+  const fadeOut = () => fade(true, fadeIn)
   const fadeIn = () => {
+    if (stopped) return
     queue.jump(SPLASH_START)
-    setFaded(false)
-    timer = setTimeout(solve, FADE_MS + REST_MS.scrambled)
+    fade(false, startPass)
   }
 
   const unsubscribe = queue.subscribe(() => {
@@ -45,28 +48,40 @@ export function playSplashLoop(queue: MoveQueue, setFaded: (faded: boolean) => v
       timer = setTimeout(fadeOut, REST_MS.solved)
     }
   })
-  queue.jump(SPLASH_START)
-  setFaded(false)
-  timer = setTimeout(solve, REST_MS.scrambled)
+  startPass()
 
   return () => {
+    stopped = true
     unsubscribe()
     clearTimeout(timer)
   }
 }
 
-/** The splash page's looping Cube: the queue it animates, and whether it is faded out. */
-export interface SplashLoop {
-  readonly queue: MoveQueue
-  readonly faded: boolean
-}
-
-/** Plays the splash recording over and over, as playSplashLoop describes. */
-export function useSplashLoop(): SplashLoop {
+/**
+ * Plays the splash recording over and over, as playSplashLoop describes: the
+ * queue to animate, whether the Cube is faded out, and fadeFinished, to call
+ * once the Cube has finished fading.
+ */
+export function useSplashLoop(): { queue: MoveQueue; faded: boolean; fadeFinished: () => void } {
   const [queue] = useState(() => new MoveQueue(SPLASH_START))
   const [faded, setFaded] = useState(false)
+  // What the loop does once the Cube has finished the fade it asked for.
+  const afterFade = useRef<() => void>(undefined)
 
-  useEffect(() => playSplashLoop(queue, setFaded), [queue])
+  useEffect(
+    () =>
+      playSplashLoop(queue, (faded, then) => {
+        afterFade.current = then
+        setFaded(faded)
+      }),
+    [queue],
+  )
 
-  return { queue, faded }
+  const fadeFinished = () => {
+    const then = afterFade.current
+    afterFade.current = undefined
+    then?.()
+  }
+
+  return { queue, faded, fadeFinished }
 }
