@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cubular
+  labels:
+    app.kubernetes.io/name: cubular
+spec:
+  # Two replicas share the Postgres database, so restarting one Pod doesn't
+  # take Cubular down. Each replica keeps its own share rate limit.
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cubular
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cubular
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        # The image runs as the distroless nonroot user, 65532.
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cubular
+          # The overlay sets the tag: the commit SHA of the build to run.
+          image: ghcr.io/stevemiketa/rubiks-tutor
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: cubular-database
+                  key: DATABASE_URL
+          envFrom:
+            - configMapRef:
+                name: cubular
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+          # /readyz checks the database and answers within about a second,
+          # even when the database doesn't, so 2 seconds is always enough.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]

@@ -27,10 +27,11 @@ Each gate step has its own command, and CI runs the same ones on every pull requ
 | Go tests | `make test-go` | `gofmt` check, `go vet ./...`, `go test ./...` |
 | Type-check | `make typecheck` | `tsc -b` in `web/` |
 | Vitest | `make test-web` | `vitest run` in `web/` |
+| Manifests | `make check-manifests` | builds the kustomize overlay in `deploy/` and validates it against the Kubernetes schemas |
 | Playwright | `make e2e` | builds the binary, then runs the browser journeys in `web/e2e/` against it |
 | **Whole gate** | `make gate` | all of the above, in that order |
 
-`make help` lists every target.
+`make help` lists every target. A separate `Image` workflow builds the container image on every pull request and publishes it from `master` (see [Deploying](#deploying)).
 
 The Playwright suite starts the binary itself with `PORT=0`, so the OS picks a free port, and reads the address from the server's `listening` log line. Several suites can run at the same time, in different worktrees, without colliding. These environment variables change what it tests:
 
@@ -80,6 +81,10 @@ CUBULAR_TEST_POSTGRES_URL='postgres://postgres:cubular@localhost:5432/postgres?s
 
 They need a user who may create schemas: each test works in a new schema, which it drops when it ends, so they leave nothing behind. Several runs can share one database at once. Without `CUBULAR_TEST_POSTGRES_URL` they're skipped, except in CI (where `CI` is set), where they fail.
 
+## Deploying
+
+Cubular ships as one container image, published to GHCR from every push to `master` and tagged with the commit SHA, and deploys to Kubernetes with the kustomize manifests in `deploy/`. [`deploy/README.md`](deploy/README.md) explains the image, the Secret and overlay values to provide, and how to apply them.
+
 ## Layout
 
 | Path | Contents |
@@ -100,6 +105,8 @@ They need a user who may create schemas: each test works in a new schema, which 
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |
 | `web/src/routing/` | Client-side routing between the splash page and the tutor |
 | `web/e2e/` | Playwright journeys |
+| `Dockerfile` | The container image: the frontend, then the Go binary with it embedded, on a distroless base |
+| `deploy/` | The kustomize base and the self-hosted cluster's overlay |
 
 ## Shared cube test cases
 
