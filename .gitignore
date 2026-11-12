@@ -28,6 +28,20 @@ go.work.sum
 # env file
 .env
 
+# Build output
+/bin/
+/web/dist/site/
+
+# Frontend
+node_modules/
+/web/test-results/
+/web/playwright-report/
+/web/blob-report/
+
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local SQLite database (DATABASE_URL defaults to sqlite:cubular.db)
+/cubular.db
+/cubular.db-*

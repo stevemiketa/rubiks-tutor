@@ -1,0 +1,16 @@
+# Keep the build context to the sources the Dockerfile builds from.
+.git
+.github
+.agents
+.claude
+bin
+deploy
+docs
+*.md
+cubular.db
+cubular.db-*
+web/node_modules
+web/dist/site
+web/test-results
+web/playwright-report
+web/blob-report

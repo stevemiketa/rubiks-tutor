@@ -1,0 +1,21 @@
+{
+  "kind": "inverse",
+  "description": "Inverting Moves. Each case's moves must invert to inverse (printed as notation), and applying moves then inverse to start (a solved Cube when start is absent) must return to start.",
+  "cases": [
+    {"name": "no Moves", "moves": "", "inverse": ""},
+    {"name": "a clockwise Turn", "moves": "R", "inverse": "R'"},
+    {"name": "a counterclockwise Turn", "moves": "R'", "inverse": "R"},
+    {"name": "a half Turn is its own inverse", "moves": "R2", "inverse": "R2"},
+    {"name": "a middle Layer", "moves": "M", "inverse": "M'"},
+    {"name": "a counterclockwise middle Layer", "moves": "E'", "inverse": "E"},
+    {"name": "a middle Layer half Turn", "moves": "S2", "inverse": "S2"},
+    {"name": "a Cube rotation", "moves": "x", "inverse": "x'"},
+    {"name": "a counterclockwise Cube rotation", "moves": "y'", "inverse": "y"},
+    {"name": "a Cube rotation half turn", "moves": "z2", "inverse": "z2"},
+    {"name": "a sequence reverses its order", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "moves": "R U R' U'", "inverse": "U R U' R'"},
+    {"name": "every Move type in one sequence", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "moves": "R U2 M' x E S2 y'", "inverse": "y S2 E' x' M U2 R'"},
+    {"name": "every Move", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "moves": "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2 M M' M2 E E' E2 S S' S2 x x' x2 y y' y2 z z' z2", "inverse": "z2 z z' y2 y y' x2 x x' S2 S S' E2 E E' M2 M M' B2 B B' F2 F F' D2 D D' U2 U U' L2 L L' R2 R R'"},
+    {"name": "the kociemba README Solution", "start": "YROWWBGBR BOWRRORWB ORYYGYOGW GWGGYBRYW BRWGOOGYY BGOWBORBY", "moves": "D2 R' D' F2 B D R2 D2 R' F2 D' F2 U' B2 L2 U2 D R2 U", "inverse": "U' R2 D' U2 L2 B2 U F2 D F2 R D2 R2 D' B' F2 D R D2"},
+    {"name": "the superflip Algorithm", "moves": "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2", "inverse": "F2 U2 B2 L' R F' R2 D U R' B2 L' U2 R' B2 R' B' F' R2 U'"}
+  ]
+}

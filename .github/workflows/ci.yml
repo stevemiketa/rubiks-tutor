@@ -1,0 +1,92 @@
+name: CI
+
+# Each job runs the same make target a developer runs locally (see README).
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go tests (store suite on SQLite and Postgres)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_PASSWORD: cubular
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      # The Postgres tests skip without it locally, and fail without it in CI.
+      CUBULAR_TEST_POSTGRES_URL: postgres://postgres:cubular@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: make test-go
+
+  web:
+    name: Type-check and Vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make deps
+      - run: make typecheck
+      - run: make test-web
+
+  manifests:
+    name: Kubernetes manifests build and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The Makefile pins kustomize and kubeconform, and runs them with go run.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: make check-manifests
+
+  e2e:
+    name: Playwright against the built binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: make deps
+      - name: Install Chromium and its system libraries
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - run: make e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          retention-days: 7

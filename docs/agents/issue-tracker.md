@@ -18,6 +18,16 @@ Infer the repo from `git remote -v`; `gh` does this automatically when run insid
 
 File issues only into the user's own repo. Never file into `mattpocock/skills` (the repo these skills come from) unless the user owns it. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.
 
+## Ideas
+
+A raw idea that still needs grilling is an issue labelled `idea`. Keep it cheap to file: a title, a sentence or two, and any open questions already known. Don't write a spec when filing an idea.
+
+- **File an idea**: `gh issue create --label idea --title "..." --body "..."`, with an `## Idea` section and an optional `## Questions for grilling` section.
+- **List ideas**: `gh issue list --label idea --state open`.
+- **Develop an idea**: grill it (`/grilling` or `/claude-config:design-loop`), then rewrite the body as a ticket (Parent / What to build / Acceptance criteria). If it is big, rewrite it as a spec issue with sub-issues instead. Then `gh issue edit <n> --remove-label idea --add-label ready-for-agent`.
+- **Reject an idea**: comment with the reason, `gh issue edit <n> --add-label wontfix`, then close it.
+- Decisions reached while grilling go in `docs/adr/`, and new terms go in `GLOSSARY.md`. The issue links to them rather than holding them.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
