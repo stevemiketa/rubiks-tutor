@@ -31,3 +31,10 @@ export const moveHistory = (page: Page): Locator =>
 /** The Scramble, as 25 outer-Layer Turns in standard notation. */
 export const scramble = (page: Page): Locator =>
   page.getByRole('region', { name: 'Scramble' }).getByText(/^(?:[RLUDFB][2']? ){24}[RLUDFB][2']?$/)
+
+/** The Solution panel: the Solve button, the Stage list and Playback. */
+export const solutionPanel = (page: Page): Locator => page.getByRole('region', { name: 'Solution' })
+
+/** Each Stage in the loaded Solution's Stage list, by name. */
+export const stages = (page: Page): Locator =>
+  solutionPanel(page).getByRole('list', { name: 'Stages' }).getByRole('listitem')

@@ -55,13 +55,14 @@ Logs are structured JSON on stdout, one line per request.
 | Path | Contents |
 |---|---|
 | `cmd/cubular/` | The server's entry point: configuration, listening, graceful shutdown |
-| `internal/server/` | The HTTP router and its tests, which drive it in-process |
+| `internal/server/` | The HTTP router and its tests, which drive it in-process, including the solver's property tests through `POST /api/solve` |
 | `internal/cube/` | The Go cube model: Cube state, notation, Moves, relabeling and Pieces. Its package doc defines the Sticker layout both models share |
+| `internal/solver/` | The beginner's-Method solver ([ADR 0001](docs/adr/0001-own-method-based-solver-in-go.md)): a pipeline of Stages, each with its goal, Moves, notes, Algorithms and Pieces |
 | `testdata/cube/` | The shared cube test cases, which both cube models must pass |
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
 | `web/src/cube/` | The TypeScript cube model, the same as the Go one |
-| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, and `Tutor`, which the tutor page reads |
+| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, and `Tutor`, which the tutor page reads |
 | `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |

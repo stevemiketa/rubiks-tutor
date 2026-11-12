@@ -5,6 +5,7 @@ import { MoveHistory } from '../tutor/MoveHistory.tsx'
 import { NotationSheet } from '../tutor/NotationSheet.tsx'
 import { RotateControls } from '../tutor/RotateControls.tsx'
 import { ScramblePanel } from '../tutor/ScramblePanel.tsx'
+import { SolutionPanel } from '../tutor/SolutionPanel.tsx'
 import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useTutor } from '../tutor/useTutor.ts'
 
@@ -52,11 +53,21 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
           <ScramblePanel
             scramble={session.scramble}
             confirming={state.confirming === 'new-scramble'}
-            // Undone Moves count too: redo could bring them back.
-            movesMade={session.history.length + session.undone.length}
+            // Undone Moves count too: redo could bring them back. So do Moves played from a Solution.
+            movesMade={session.history.length + session.undone.length + session.position}
             onNewScramble={() => tutor.newScramble()}
             onConfirm={() => tutor.confirmNewScramble()}
             onCancel={() => tutor.cancelNewScramble()}
+          />
+          <SolutionPanel
+            solution={session.solution}
+            position={session.position}
+            playing={session.playing}
+            status={state.solveStatus}
+            disabled={state.scrambling}
+            onSolve={() => void tutor.solve()}
+            onPlay={() => tutor.play()}
+            onPause={() => tutor.pause()}
           />
           <TurnControls
             selected={state.selected}
