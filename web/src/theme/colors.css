@@ -41,7 +41,7 @@
   --color-on-success: #ffffff;
   --color-danger: light-dark(#fde8e8, #7f1d1d);
   --color-danger-hover: light-dark(#fbd3d3, #991b1b);
-  --color-danger-border: light-dark(#c81e1e, #e03131);
+  --color-danger-border: light-dark(#c81e1e, #f36464);
   --color-warning: light-dark(#b45309, #f59e0b);
   --color-on-warning: light-dark(#ffffff, #11131a);
   --color-caution: light-dark(#c2410c, #d97706);
