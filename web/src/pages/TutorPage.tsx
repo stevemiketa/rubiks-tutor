@@ -2,6 +2,8 @@ import { Link } from '../routing/Link.tsx'
 import { CubeView } from '../scene/CubeView.tsx'
 import { isSelectable } from '../session/index.ts'
 import { MoveHistory } from '../tutor/MoveHistory.tsx'
+import { NotationSheet } from '../tutor/NotationSheet.tsx'
+import { RotateControls } from '../tutor/RotateControls.tsx'
 import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useTutor } from '../tutor/useTutor.ts'
 
@@ -9,7 +11,8 @@ import { useTutor } from '../tutor/useTutor.ts'
 // Snapshot arrives in a later ticket.
 export function TutorPage({ snapshotId }: { snapshotId?: string }) {
   const { tutor, state } = useTutor()
-  const solved = state.session.isSolved()
+  const { session } = state
+  const solved = session.isSolved()
 
   return (
     <main className="tutor">
@@ -18,6 +21,9 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
           Cubular
         </Link>
         <h1>Tutor</h1>
+        <div className="tutor-tools">
+          <NotationSheet />
+        </div>
       </header>
       {snapshotId && <p className="notice">Snapshot {snapshotId} will open here.</p>}
 
@@ -28,19 +34,28 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
             selected={state.selected}
             onSelect={(sticker) => tutor.select(sticker)}
             selectable={isSelectable}
+            onRotate={(rotations) => tutor.recordDrag(rotations)}
             label="The Cube, seen from the front, top and right"
           />
           <div className="tutor-status">
             <p role="status">{solved && <span className="solved">Solved</span>}</p>
             <p role="status" className="hint">
-              {state.hint === 'select-sticker' && 'Select a Sticker first: click one on the front, top or right face.'}
+              {state.hint === 'select-sticker' &&
+                'Select a Sticker first: click one on the front, top or right face, or press W, A, S or D.'}
             </p>
           </div>
         </div>
 
         <div className="tutor-panel">
           <TurnControls selected={state.selected} onTurn={(direction) => tutor.turn(direction)} />
-          <MoveHistory moves={state.session.history} />
+          <RotateControls onRotate={(direction) => tutor.rotate(direction)} />
+          <MoveHistory
+            moves={session.history}
+            canUndo={session.canUndo}
+            canRedo={session.canRedo}
+            onUndo={() => tutor.undo()}
+            onRedo={() => tutor.redo()}
+          />
         </div>
       </div>
     </main>

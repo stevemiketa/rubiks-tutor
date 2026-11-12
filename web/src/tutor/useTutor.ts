@@ -3,7 +3,9 @@ import { Tutor, commandForKey, type TutorState } from '../session/index.ts'
 
 /**
  * The page's Tutor and its current state. The Tutor lives as long as the
- * component, and the arrow keys anywhere on the page go to it.
+ * component, and the tutor's keys anywhere on the page go to it, except in
+ * text fields and while a modal dialog (such as the notation cheat sheet) is
+ * open, which keeps Esc and the arrows for itself.
  */
 export function useTutor(): { tutor: Tutor; state: TutorState } {
   const [tutor] = useState(() => new Tutor())
@@ -11,7 +13,7 @@ export function useTutor(): { tutor: Tutor; state: TutorState } {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || isTextEntry(event.target)) return
+      if (event.defaultPrevented || isTextEntry(event.target) || document.querySelector('dialog:modal')) return
       // A held key repeats; only deliberate presses make Moves.
       if (event.repeat) {
         if (commandForKey(event) !== undefined) event.preventDefault()

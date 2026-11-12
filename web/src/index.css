@@ -226,3 +226,158 @@ a {
   overflow-y: auto;
   list-style: none;
 }
+
+.tutor-tools {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.cube-view.draggable canvas {
+  /* Drags rotate the Cube, so touches mustn't scroll the page here. */
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.panel-heading h2 {
+  margin: 0;
+}
+
+.history-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.small-button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid #3a4150;
+  border-radius: 0.4rem;
+  background: #252a36;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.small-button:hover:not(:disabled),
+.small-button:focus-visible {
+  background: #313848;
+}
+
+.small-button:disabled {
+  color: #6b7280;
+  cursor: default;
+}
+
+.rotate-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 3.5rem);
+  grid-template-areas:
+    'ccw up cw'
+    'left . right'
+    '. down .';
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.rotate-counterclockwise {
+  grid-area: ccw;
+}
+
+.rotate-up {
+  grid-area: up;
+}
+
+.rotate-clockwise {
+  grid-area: cw;
+}
+
+.rotate-left {
+  grid-area: left;
+}
+
+.rotate-right {
+  grid-area: right;
+}
+
+.rotate-down {
+  grid-area: down;
+}
+
+/* The notation cheat sheet */
+
+.sheet {
+  width: min(36rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  border: 1px solid #3a4150;
+  border-radius: 0.75rem;
+  background: #1a1d26;
+  color: inherit;
+}
+
+.sheet::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.sheet-body {
+  padding: 1.25rem;
+}
+
+.sheet h2 {
+  font-size: 1.25rem;
+}
+
+.sheet h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.sheet p {
+  margin: 0 0 0.5rem;
+}
+
+.terms {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.terms > div {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0.75rem;
+}
+
+.terms.keys > div {
+  grid-template-columns: 11rem 1fr;
+}
+
+.terms dt {
+  font-weight: 700;
+}
+
+.terms dd {
+  margin: 0;
+}
+
+kbd {
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+code.notation {
+  padding: 0 0.2rem;
+  border-radius: 0.25rem;
+  background: #252a36;
+}

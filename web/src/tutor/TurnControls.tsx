@@ -34,14 +34,17 @@ export function TurnControls({
   return (
     <section className="panel" aria-labelledby="turn-heading">
       <h2 id="turn-heading">Turn</h2>
+      {/* Announced as it changes, so choosing a Sticker from the keyboard is heard. */}
+      <p aria-live="polite">
+        {selected === undefined ? 'No Sticker selected.' : `Selected: ${describeSticker(selected)}`}
+      </p>
       {selected === undefined ? (
         <p className="muted">
-          Click a Sticker on the front, top or right face. Then use the arrow keys or the buttons here to turn the
-          Layers through it.
+          Click a Sticker on the front, top or right face, or choose one with the W, A, S and D keys. Then use the
+          arrow keys or the buttons here to turn the Layers through it.
         </p>
       ) : (
         <>
-          <p>Selected: {describeSticker(selected)}</p>
           <div className="turn-pad" role="group" aria-label="Turn the selected Sticker’s Layers">
             {DIRECTIONS.map((direction) => {
               const move = formatMove(turnFor(selected, direction))
