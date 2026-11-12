@@ -3,8 +3,18 @@
 // for the learner) and the MoveQueue the 3D scene animates. It starts new
 // Sessions and saves the Session after every change. React reads it through
 // useSyncExternalStore; nothing here renders.
-import { Cube, type Move, type Sticker } from '../cube/index.ts'
-import { commandForKey, isSelectable, turnFor, type Command, type Direction, type KeyPress } from './controls.ts'
+import { Cube, formatMove, inverse, isRotation, type Move, type Sticker } from '../cube/index.ts'
+import {
+  commandForKey,
+  isSelectable,
+  rotationFor,
+  stepSelection,
+  turnFor,
+  type Command,
+  type Direction,
+  type KeyPress,
+  type RotationDirection,
+} from './controls.ts'
 import { MoveQueue } from './moveQueue.ts'
 import { generateScramble } from './scramble.ts'
 import { Session } from './session.ts'
@@ -25,7 +35,7 @@ export type Confirmation = 'new-scramble'
 /** Everything the tutor's UI shows, as one immutable snapshot. */
 export interface TutorState {
   readonly session: Session
-  /** The selected Sticker: a position on screen, which stays put through Turns. */
+  /** The selected Sticker: a position on screen, which stays put through Turns and Cube rotations. */
   readonly selected: Sticker | undefined
   readonly hint: Hint | undefined
   /**
@@ -48,6 +58,11 @@ export interface TutorOptions {
    * starts. If so, the Scramble appears already applied instead of playing.
    */
   readonly reducedMotion?: () => boolean
+  /**
+   * Whether there is a scene to animate the queue. If not (no WebGL), each
+   * Move, undo and redo is shown at once instead of queued. True by default.
+   */
+  readonly animates?: () => boolean
 }
 
 export class Tutor {
@@ -92,10 +107,12 @@ export class Tutor {
 
   /**
    * Starts a new Session with a fresh Scramble. If Moves were made after the
-   * Scramble, asks the learner to confirm first: see confirmNewScramble.
+   * Scramble, even ones since undone (redo could bring them back), asks the
+   * learner to confirm first: see confirmNewScramble.
    */
   newScramble(): void {
-    if (this.#state.session.history.length > 0) this.#update({ confirming: 'new-scramble' })
+    const { session } = this.#state
+    if (session.canUndo || session.canRedo) this.#update({ confirming: 'new-scramble' })
     else this.#startNew()
   }
 
@@ -115,6 +132,15 @@ export class Tutor {
     this.#update({ selected: sticker, hint: undefined })
   }
 
+  /** Moves the selection to the next Sticker one way, or selects the front face's center. */
+  stepSelection(direction: Direction): void {
+    this.select(stepSelection(this.#state.selected, direction))
+  }
+
+  clearSelection(): void {
+    if (this.#state.selected !== undefined) this.#update({ selected: undefined })
+  }
+
   /** Turns the Layer through the selected Sticker, or asks for a selection. */
   turn(direction: Direction): void {
     const { selected } = this.#state
@@ -125,11 +151,61 @@ export class Tutor {
     this.#move(turnFor(selected, direction))
   }
 
+  /** Rotates the whole Cube one way. The selection stays on the same spot on screen. */
+  rotate(direction: RotationDirection): void {
+    this.#move(rotationFor(direction))
+  }
+
+  /**
+   * Records the Cube rotations that a drag ended on. The scene has already
+   * shown the Cube turning, so they are queued to show at once rather than
+   * animate again.
+   */
+  recordDrag(rotations: readonly Move[]): void {
+    for (const rotation of rotations) {
+      if (!isRotation(rotation)) throw new RangeError(`a drag recorded ${formatMove(rotation)}, which is not a Cube rotation`)
+    }
+    for (const rotation of rotations) this.#move(rotation, 0)
+  }
+
+  /** Undoes the last Move, animating it backward. Does nothing if there is none, or while the Scramble plays. */
+  undo(): void {
+    const { session, scrambling } = this.#state
+    const last = session.history.at(-1)
+    if (last === undefined || scrambling) return
+    this.#show(inverse(last))
+    this.#update({ session: session.undo() })
+  }
+
+  /** Makes the last undone Move again. Does nothing if there is none, or while the Scramble plays. */
+  redo(): void {
+    const { session, scrambling } = this.#state
+    const next = session.undone.at(-1)
+    if (next === undefined || scrambling) return
+    this.#show(next)
+    this.#update({ session: session.redo() })
+  }
+
   /** Does what a Command asks. */
   run(command: Command): void {
     switch (command.kind) {
       case 'turn':
         this.turn(command.direction)
+        return
+      case 'rotate':
+        this.rotate(command.direction)
+        return
+      case 'step-selection':
+        this.stepSelection(command.direction)
+        return
+      case 'clear-selection':
+        this.clearSelection()
+        return
+      case 'undo':
+        this.undo()
+        return
+      case 'redo':
+        this.redo()
         return
     }
   }
@@ -145,13 +221,21 @@ export class Tutor {
     return true
   }
 
-  // Every Move goes through here, so the Session and what the scene will
-  // show once its queue drains always agree. Moves wait for the Scramble:
-  // until it finishes, they are ignored.
-  #move(move: Move): void {
+  // Every new Move goes through here, so the Session and what the scene will
+  // show once its queue drains always agree. Undo and redo queue their own
+  // Moves the same way. Moves wait for the Scramble: until it finishes, they
+  // are ignored.
+  #move(move: Move, durationMs?: number): void {
     if (this.#state.scrambling) return
-    this.queue.enqueue(move)
+    this.#show(move, durationMs)
     this.#update({ session: this.#state.session.move(move) })
+  }
+
+  // Queues a Move for the scene to animate, or shows it at once when there is
+  // no scene to play the queue.
+  #show(move: Move, durationMs?: number): void {
+    if (this.#options.animates?.() === false) this.queue.jump(this.queue.target.apply([move]))
+    else this.queue.enqueue(move, durationMs)
   }
 
   // Starts a new Session with a fresh Scramble, played from a solved Cube.

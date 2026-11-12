@@ -1,7 +1,7 @@
 // The Session lifecycle in the Tutor: a new Session plays its Scramble, "New
 // scramble" starts over, and the Session survives a reload.
 import { describe, expect, it } from 'vitest'
-import { formatMoves, stickerAt } from '../cube/index.ts'
+import { formatMoves, parseMoves, stickerAt } from '../cube/index.ts'
 import { SessionStore, Tutor, type MoveQueue, type StorageLike } from './index.ts'
 
 // Plays the queue the way the scene does, until nothing is left. Returns how
@@ -79,6 +79,20 @@ describe('Tutor while the Scramble plays', () => {
     playAll(tutor.queue)
     expect(tutor.getState().selected).toBe(frontCenter)
   })
+
+  it('makes no Cube rotations, and neither undoes nor redoes, until the Scramble finishes', () => {
+    const tutor = Tutor.open()
+    const scramble = formatMoves(tutor.getState().session.scramble)
+
+    tutor.press({ key: 'ArrowLeft', shiftKey: true })
+    tutor.rotate('clockwise')
+    tutor.recordDrag(parseMoves('y'))
+    tutor.press({ key: 'z', ctrlKey: true })
+    tutor.press({ key: 'z', ctrlKey: true, shiftKey: true })
+
+    expect(tutor.getState().session.history).toEqual([])
+    expect(queued(tutor.queue)).toBe(scramble)
+  })
 })
 
 describe('Tutor.newScramble', () => {
@@ -126,6 +140,17 @@ describe('Tutor.newScramble', () => {
     expect(tutor.getState().confirming).toBe('new-scramble')
     expect(tutor.getState().session).toBe(before)
     expect(tutor.queue.isIdle).toBe(false)
+  })
+
+  it('asks first when every Move was undone, since redo could still bring them back', () => {
+    const tutor = withMoves('ArrowUp')
+    tutor.undo()
+    const before = tutor.getState().session
+
+    tutor.newScramble()
+
+    expect(tutor.getState().confirming).toBe('new-scramble')
+    expect(tutor.getState().session).toBe(before)
   })
 
   it('keeps the Session when the learner says no', () => {
@@ -208,6 +233,21 @@ describe('Tutor saving the Session', () => {
     tutor.press({ key: 'ArrowUp' })
 
     expect(saves.filter(Boolean)).toEqual(["M'", "M' M'"])
+  })
+
+  it('saves after undo and redo, so a reload can still redo', () => {
+    const storage = memoryStorage()
+    const first = reload(storage)
+    playAll(first.queue)
+    first.select(frontCenter)
+    for (const key of ['ArrowUp', 'ArrowRight']) first.press({ key })
+    first.undo()
+
+    const tutor = reload(storage)
+    expect(formatMoves(tutor.getState().session.history)).toBe("M'")
+    tutor.redo()
+    expect(formatMoves(tutor.getState().session.history)).toBe("M' E")
+    expect(formatMoves(new SessionStore(storage).load()?.history ?? [])).toBe("M' E")
   })
 
   it('saves the new Session that replaces one', () => {

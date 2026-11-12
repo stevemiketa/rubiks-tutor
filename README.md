@@ -61,7 +61,7 @@ Logs are structured JSON on stdout, one line per request.
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
 | `web/src/cube/` | The TypeScript cube model, the same as the Go one |
-| `web/src/session/` | The Session model, with no rendering code: the Session, Scrambles, saving the Session in browser storage, the turning controls, the queue of Moves to animate, and `Tutor`, which the tutor page reads |
+| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, and `Tutor`, which the tutor page reads |
 | `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |
