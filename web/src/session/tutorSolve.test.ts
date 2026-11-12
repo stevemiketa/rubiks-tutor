@@ -53,6 +53,20 @@ function handSolver() {
 // A solver that always answers with the recorded Solution.
 const recordedSolver = () => Promise.resolve(parseSolveResponse(recorded))
 
+// The recorded Stage split in two by hand, for a Solution with a boundary
+// between Stages: the same Moves, so it solves the same Cube.
+const [crossStage] = recorded.stages
+const twoStageSolver = () =>
+  Promise.resolve(
+    parseSolveResponse({
+      solved: false,
+      stages: [
+        { ...crossStage, moves: "U B2 R' D' B2", notes: [], pieces: [] },
+        { ...crossStage, id: 'white-corners', name: 'White corners', moves: "U B U' L", notes: [], pieces: [] },
+      ],
+    }),
+  )
+
 function tutorWith(session: Session, options: TutorOptions): Tutor {
   return new Tutor(session, options)
 }
@@ -241,5 +255,148 @@ describe('Tutor Playback', () => {
     expect(session.playing).toBe(false)
     expect(tutor.queue.isIdle).toBe(true)
     expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
+  })
+
+  it('steps forward and back one Move at a time, animating each, and stops back at the Cube from before Solve', async () => {
+    const tutor = await solved()
+
+    tutor.stepForward()
+    tutor.stepForward()
+    expect(queued(tutor.queue)).toBe('U B2')
+    expect(tutor.getState().session.position).toBe(2)
+
+    tutor.stepBack()
+    expect(queued(tutor.queue)).toBe('U B2 B2')
+    playAll(tutor.queue)
+    expect(tutor.getState().session.position).toBe(1)
+    expect(tutor.queue.shown.toString()).toBe(tutor.getState().session.cube.toString())
+
+    tutor.stepBack()
+    tutor.stepBack()
+    expect(queued(tutor.queue)).toBe("U'")
+    playAll(tutor.queue)
+    expect(tutor.getState().session.position).toBe(0)
+    expect(tutor.queue.shown.toString()).toBe(scrambled().cube.toString())
+  })
+
+  it('pauses Playback to step: the step plays after the Move animating now, and nothing after it', async () => {
+    const tutor = await solved()
+    tutor.play()
+
+    tutor.stepForward()
+    playAll(tutor.queue)
+
+    expect(tutor.getState().session.playing).toBe(false)
+    expect(tutor.getState().session.position).toBe(2)
+    expect(tutor.queue.shown.toString()).toBe(tutor.getState().session.cube.toString())
+  })
+
+  it('animates a half Turn in the Solution as one 180° Move', async () => {
+    const tutor = await solved()
+    tutor.stepForward()
+    playAll(tutor.queue)
+
+    tutor.stepForward()
+
+    expect(tutor.queue.pending).toHaveLength(1)
+    expect(tutor.queue.current?.move).toEqual({ letter: 'B', amount: 2 })
+  })
+
+  it('reverses one Move at a time as the scene finishes each, and stops at the Cube from before Solve', async () => {
+    const tutor = await solved()
+    tutor.stepForward()
+    tutor.stepForward()
+    tutor.stepForward()
+
+    tutor.reverse()
+    expect(tutor.getState().session.reversing).toBe(true)
+    // The steps finish first; then Playback takes back R', then B2.
+    expect(queued(tutor.queue)).toBe("U B2 R'")
+    playAll(tutor.queue)
+
+    const { session } = tutor.getState()
+    expect(session.position).toBe(0)
+    expect(session.reversing).toBe(false)
+    expect(tutor.queue.shown.toString()).toBe(scrambled().cube.toString())
+  })
+
+  it('animates the Solution’s Moves at the speed the learner picks', async () => {
+    const tutor = await solved()
+
+    tutor.setSpeed(2)
+    tutor.play()
+    expect(tutor.getState().session.speed).toBe(2)
+    // At 1× a quarter Turn takes 250 ms and a half Turn 375 ms.
+    expect(tutor.queue.current?.durationMs).toBe(125)
+    tutor.queue.finish(tutor.queue.current!)
+    expect(tutor.queue.current?.durationMs).toBe(187.5)
+
+    tutor.setSpeed(0.5)
+    tutor.stepBack()
+    expect(tutor.queue.pending.map((q) => q.durationMs)).toEqual([187.5, 750])
+  })
+
+  it('scrubs to any Move at once, pausing Playback', async () => {
+    const tutor = await solved()
+    tutor.play()
+
+    tutor.seek(5)
+
+    const { session } = tutor.getState()
+    expect(session.position).toBe(5)
+    expect(session.playing).toBe(false)
+    expect(tutor.queue.isIdle).toBe(true)
+    expect(tutor.queue.shown.toString()).toBe(play(scrambled(), "U B2 R' D' B2").cube.toString())
+
+    tutor.seek(1)
+    expect(tutor.queue.shown.toString()).toBe(play(scrambled(), 'U').cube.toString())
+  })
+
+  it('jumps to a Stage’s first Move at once', async () => {
+    const tutor = await solved({ solve: twoStageSolver })
+    tutor.play()
+
+    tutor.jumpToStage(1)
+
+    const { session } = tutor.getState()
+    expect(session.position).toBe(5)
+    expect(session.playing).toBe(false)
+    expect(tutor.queue.isIdle).toBe(true)
+    expect(tutor.queue.shown.toString()).toBe(play(scrambled(), "U B2 R' D' B2").cube.toString())
+  })
+
+  it('pauses at the end of each Stage, until the learner turns auto-pause off', async () => {
+    const tutor = await solved({ solve: twoStageSolver })
+
+    tutor.play()
+    playAll(tutor.queue)
+    expect(tutor.getState().session.position).toBe(5)
+    expect(tutor.getState().session.playing).toBe(false)
+
+    tutor.jumpToStage(0)
+    tutor.setAutoPause(false)
+    tutor.play()
+    playAll(tutor.queue)
+    expect(tutor.getState().session.position).toBe(9)
+    expect(tutor.getState().session.autoPause).toBe(false)
+  })
+
+  it('plays and pauses with Space while a Solution is loaded, and leaves Space to the browser otherwise', async () => {
+    const tutor = tutorWith(scrambled(), { solve: recordedSolver })
+    expect(tutor.press({ key: ' ' })).toBe(false)
+    await tutor.solve()
+
+    expect(tutor.press({ key: ' ' })).toBe(true)
+    expect(tutor.getState().session.playing).toBe(true)
+    expect(tutor.press({ key: ' ' })).toBe(true)
+    expect(tutor.getState().session.playing).toBe(false)
+
+    playAll(tutor.queue)
+    tutor.reverse()
+    tutor.press({ key: ' ' })
+    expect(tutor.getState().session.reversing).toBe(false)
+
+    const withModifiers = [{ shiftKey: true }, { ctrlKey: true }, { metaKey: true }, { altKey: true }]
+    expect(withModifiers.map((m) => tutor.press({ key: ' ', ...m }))).toEqual([false, false, false, false])
   })
 })

@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { solutionPanel, stages } from './tutor.ts'
-
-// How far Playback has got, as the Solution panel shows it.
-const progress = (page: Page) => solutionPanel(page).getByText(/^\d+ of \d+ Moves played$/)
+import { progress, solutionPanel, stages } from './tutor.ts'
 
 async function movesPlayed(page: Page): Promise<{ played: number; total: number }> {
   const [played, total] = ((await progress(page).textContent()) ?? '').match(/\d+/g)?.map(Number) ?? []

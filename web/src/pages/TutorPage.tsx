@@ -82,14 +82,11 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               onCancel={() => tutor.cancelNewScramble()}
             />
             <SolutionPanel
-              solution={session.solution}
-              position={session.position}
-              playing={session.playing}
+              session={session}
               status={state.solveStatus}
               disabled={waiting}
               onSolve={() => void tutor.solve()}
-              onPlay={() => tutor.play()}
-              onPause={() => tutor.pause()}
+              playback={tutor}
             />
             <TurnControls selected={state.selected} disabled={waiting} onTurn={(direction) => tutor.turn(direction)} />
             <RotateControls disabled={waiting} onRotate={(direction) => tutor.rotate(direction)} />

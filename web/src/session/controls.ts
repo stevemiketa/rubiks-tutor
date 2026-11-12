@@ -86,6 +86,7 @@ export type Command =
   | { readonly kind: 'clear-selection' }
   | { readonly kind: 'undo' }
   | { readonly kind: 'redo' }
+  | { readonly kind: 'play-pause' }
 
 const ARROWS: Readonly<Record<string, Direction>> = {
   ArrowUp: 'up',
@@ -104,6 +105,7 @@ const SELECTION_KEYS: Readonly<Record<string, Direction>> = { w: 'up', a: 'left'
  *   arrow rotates the whole Cube
  * - W, A, S and D move the selection, and Esc clears it
  * - Ctrl/Cmd+Z undoes and Shift+Ctrl/Cmd+Z redoes
+ * - Space plays or pauses Playback
  *
  * Other keys held with Ctrl, Cmd or Alt are left to the browser, which uses
  * them for its own shortcuts.
@@ -121,6 +123,7 @@ export function commandForKey(press: KeyPress): Command | undefined {
     return press.shiftKey ? { kind: 'rotate', direction: arrow } : { kind: 'turn', direction: arrow }
   }
   if (key === 'Escape') return { kind: 'clear-selection' }
+  if (key === ' ' && !press.shiftKey) return { kind: 'play-pause' }
   const step = SELECTION_KEYS[key]
   if (step !== undefined && !press.shiftKey) return { kind: 'step-selection', direction: step }
   return undefined

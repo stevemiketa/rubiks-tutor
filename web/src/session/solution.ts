@@ -35,6 +35,20 @@ export interface Solution {
   readonly moves: readonly Move[]
 }
 
+/**
+ * Where each Stage starts in the Solution's Moves, in Stage order: the
+ * position Playback is at once every earlier Stage has been played. Each
+ * Stage ends where the next starts, and the last at the end of the Solution.
+ */
+export function stageStarts(solution: Solution): readonly number[] {
+  let start = 0
+  return solution.stages.map((stage) => {
+    const at = start
+    start += stage.moves.length
+    return at
+  })
+}
+
 /** What Solve answers: the Cube was already solved, or here is its Solution. */
 export type SolveResult = { readonly solved: true } | { readonly solved: false; readonly solution: Solution }
 

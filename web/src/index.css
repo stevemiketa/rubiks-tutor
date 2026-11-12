@@ -436,19 +436,141 @@ a {
   margin: 0;
 }
 
+/* Each Stage's name jumps to it; its Moves follow in notation. The list
+   scrolls by itself to keep the current Move in view. */
 .stage-list {
+  max-height: 18rem;
   margin: 0 0 0.75rem;
   padding-left: 1.5rem;
+  overflow-y: auto;
+}
+
+.stage-list > li + li {
+  margin-top: 0.5rem;
+}
+
+.stage-name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stage-name:hover,
+.stage-name:focus-visible {
+  color: #8ab4ff;
+  text-decoration: underline;
+}
+
+.stage-moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.35rem;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-moves li {
+  padding: 0 0.2rem;
+  border-radius: 0.25rem;
+}
+
+/* The Move the Cube made last. */
+.stage-moves li[aria-current='step'] {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.panel .stage-list p {
+  margin: 0.25rem 0 0;
 }
 
 .playback {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .panel .playback p {
   margin: 0;
+}
+
+.playback-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.playback-options,
+.speeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.speeds {
+  gap: 0.25rem;
+}
+
+.speeds .muted {
+  margin-right: 0.25rem;
+}
+
+.action-button.speed {
+  padding-inline: 0.5rem;
+}
+
+.action-button[aria-pressed='true'] {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: #fff;
+}
+
+.scrubber {
+  width: 100%;
+  margin: 0;
+  accent-color: #3b82f6;
+}
+
+/* A switch: a track whose knob sits right when it is on. */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.switch::before {
+  content: '';
+  flex: none;
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background-color: #3a4150;
+  background-image: radial-gradient(circle at 0.625rem 50%, #f1f3f5 0.4rem, transparent 0.45rem);
+}
+
+.switch[aria-checked='true']::before {
+  background-color: #3b82f6;
+  background-image: radial-gradient(circle at 1.625rem 50%, #fff 0.4rem, transparent 0.45rem);
+}
+
+.switch:focus-visible {
+  border-radius: 0.25rem;
+  outline: 2px solid #8ab4ff;
+  outline-offset: 2px;
 }
 
 .history-actions {
