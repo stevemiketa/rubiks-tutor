@@ -42,12 +42,20 @@ func TestSolutionsFollowTheMethod(t *testing.T) {
 			t.Errorf("solving %q then %q twice gave different Solutions", scramble, history)
 		}
 
-		// Playing the first k Stages, then solving again, skips exactly them.
+		// Playing the first k Stages, then solving again, skips exactly the
+		// Stages finished by then: those k, and any later ones they happen
+		// to finish too, such as a middle layer that the white corners
+		// complete.
 		played := history
 		for k, st := range s.Stages {
-			played = strings.TrimSpace(played + " " + st.Moves)
+			played = join(played, st.Moves)
 			rest := timer.solve(t, h, scramble, played)
-			if got, want := stageIDs(rest), stageIDs(solutionBody{Stages: s.Stages[k+1:]}); !slices.Equal(got, want) {
+			checkSolution(t, scramble, played, rest)
+			later, c := s.Stages[k+1:], cubeAfter(scramble, played)
+			for len(later) > 0 && finishedAnywhere(method[methodIndex(later[0].ID)], c) {
+				later = later[1:]
+			}
+			if got, want := stageIDs(rest), stageIDs(solutionBody{Stages: later}); !slices.Equal(got, want) {
 				t.Errorf("solving %q then %q after playing %d Stage(s): got Stages %v, want %v",
 					scramble, history, k+1, got, want)
 			}
@@ -56,42 +64,70 @@ func TestSolutionsFollowTheMethod(t *testing.T) {
 	timer.check(t)
 }
 
-func TestSolveSkipsAWhiteCrossThatIsAlreadyFinished(t *testing.T) {
+func TestSolveSkipsStagesThatAreAlreadyFinished(t *testing.T) {
 	h := newTestServer(t)
-	timer := &solveTimer{}
-	r := rand.New(rand.NewPCG(*solveSeed, 1))
+	for n, tc := range []struct {
+		through string // the last of the Stages finished
+		// keep are Move sequences that keep every Stage through it finished,
+		// with white on top: bottom-Layer Turns, y rotations, and Algorithms
+		// that change only what the later Stages work on.
+		keep []string
+	}{
+		// The corner trigger takes the right edge out and puts it back.
+		{"white-cross", []string{"D", "D'", "D2", "y", "y'", "y2", "R' D' R D", "D' R' D R"}},
+		// The inserts, done with white on the bottom.
+		{"white-corners", []string{"D", "D'", "D2", "y", "y'", "y2", "x2 U R U' R' U' F' U F x2", "x2 U' L' U L U F U' F' x2"}},
+		// The yellow Stages' Algorithms, done with white on the bottom.
+		{"middle-edges", []string{
+			"D", "D'", "D2", "y", "y'", "y2", "x2 F R U R' U' F' x2", "x2 R U R' U R U2 R' x2",
+			"x2 R' F R' B2 R F' R' B2 R2 x2", "x2 R U' R U R U R U' R' U' R2 x2",
+		}},
+	} {
+		t.Run(tc.through, func(t *testing.T) {
+			timer := &solveTimer{}
+			r := rand.New(rand.NewPCG(*solveSeed, uint64(1+n)))
+			finished := method[:methodIndex(tc.through)+1]
 
-	for range propertyCases {
-		// A Cube with the cross finished: built from a solved one by Moves
-		// that keep it, or from a scrambled one by its own Stage 1. Either
-		// way the Cube is then turned to face a random way.
-		scramble, history := "", crossKeepingMoves(r)
-		if r.IntN(2) == 0 {
-			scramble, history = randomScramble(r), randomHistory(r)
-			for _, st := range timer.solve(t, h, scramble, history).Stages {
-				if st.ID == "white-cross" {
-					history = strings.TrimSpace(history + " " + st.Moves + " " + crossKeepingMoves(r))
+			for range propertyCases {
+				// A Cube with those Stages finished: built from a solved one
+				// by Moves that keep them, or from a scrambled one by its own
+				// Solution's first Stages. Either way the Cube is then turned
+				// to face a random way.
+				scramble, history := "", ""
+				if r.IntN(2) == 0 {
+					scramble, history = randomScramble(r), randomHistory(r)
+					for _, st := range timer.solve(t, h, scramble, history).Stages {
+						if methodIndex(st.ID) < len(finished) {
+							history = join(history, st.Moves)
+						}
+					}
 				}
-			}
-		}
-		history = strings.TrimSpace(history + " " + randomRotations(r))
-		c := cube.Solved().Apply(cube.MustParseMoves(scramble + " " + history)...)
-		if !whiteCrossAnywhere(c) {
-			t.Fatalf("the test built %q then %q, which has no white cross", scramble, history)
-		}
+				history = join(history, whiteUp(cubeAfter(scramble, history)), keeping(r, tc.keep), randomRotations(r))
+				c := cubeAfter(scramble, history)
+				for _, st := range finished {
+					if !finishedAnywhere(st, c) {
+						t.Fatalf("the test built %q then %q, whose Stage %s isn't finished", scramble, history, st.id)
+					}
+				}
 
-		s := timer.solve(t, h, scramble, history)
-		if slices.Contains(stageIDs(s), "white-cross") {
-			t.Errorf("solving %q then %q, whose white cross is finished: got Stages %v", scramble, history, stageIDs(s))
-		}
-		checkSolution(t, scramble, history, s)
+				s := timer.solve(t, h, scramble, history)
+				for _, st := range finished {
+					if slices.Contains(stageIDs(s), st.id) {
+						t.Errorf("solving %q then %q, whose Stage %s is finished: got Stages %v", scramble, history, st.id, stageIDs(s))
+					}
+				}
+				checkSolution(t, scramble, history, s)
+			}
+			timer.check(t)
+		})
 	}
-	timer.check(t)
 }
 
-// checkSolution checks a Solution against the Method: Stages in order, each
-// goal met at the end of its Stage, Algorithms where they say they are, and a
-// note on every Move outside an Algorithm.
+// checkSolution checks a Solution against the Method: the Method's Stages in
+// order from the first one that isn't finished, each goal met at the end of
+// its Stage, the Stage's own Algorithms where they say they are, the white
+// center where the Stage wants it after its opening Cube rotations, only the
+// Stage's setup Moves outside its Algorithms, and a note on each of those.
 func checkSolution(t *testing.T, scramble, history string, s solutionBody) {
 	t.Helper()
 	c := cube.Solved().Apply(cube.MustParseMoves(scramble + " " + history)...)
@@ -106,17 +142,27 @@ func checkSolution(t *testing.T, scramble, history string, s solutionBody) {
 		t.Errorf("%s: an unsolved Cube got no Stages list", input)
 	}
 
-	last := -1
+	// A Stage is skipped only if it and every earlier Stage are finished.
+	if !s.Solved {
+		first := slices.IndexFunc(method, func(st methodStage) bool { return !finishedAnywhere(st, c) })
+		if first < 0 {
+			first = len(method)
+		}
+		want := []string{}
+		for _, st := range method[first:] {
+			want = append(want, st.id)
+		}
+		if got := stageIDs(s); !slices.Equal(got, want) {
+			t.Errorf("%s: got Stages %v, want %v", input, got, want)
+		}
+	}
+
 	for _, st := range s.Stages {
 		i := methodIndex(st.ID)
 		if i < 0 {
 			t.Errorf("%s: unknown Stage %q", input, st.ID)
 			return
 		}
-		if i <= last {
-			t.Errorf("%s: Stages out of Method order: %v", input, stageIDs(s))
-		}
-		last = i
 
 		moves := st.moves(t)
 		inAlgorithm := make([]bool, len(moves))
@@ -127,8 +173,25 @@ func checkSolution(t *testing.T, scramble, history string, s solutionBody) {
 				t.Errorf("%s: Stage %s: Algorithm %+v does not match its Moves %q", input, st.ID, a, st.Moves)
 				continue
 			}
+			if method[i].algorithms[a.Name] != a.Notation {
+				t.Errorf("%s: Stage %s uses Algorithm %q %q, which isn't one of its own", input, st.ID, a.Name, a.Notation)
+			}
 			for j := range a.Length {
 				inAlgorithm[a.Start+j] = true
+			}
+		}
+
+		opened := c
+		j := 0
+		for ; j < len(moves) && moves[j].IsRotation() && !inAlgorithm[j]; j++ {
+			opened = opened.Apply(moves[j])
+		}
+		if opened[cube.StickerAt(method[i].whiteOn, 1, 1)] != cube.White {
+			t.Errorf("%s: Stage %s: the white center isn't on %v after the opening Cube rotations of %q", input, st.ID, method[i].whiteOn, st.Moves)
+		}
+		for ; j < len(moves); j++ {
+			if !inAlgorithm[j] && !method[i].setup(moves[j]) {
+				t.Errorf("%s: Stage %s: Move %d (%v) of %q is outside its Algorithms and isn't one of its setup Moves", input, st.ID, j, moves[j], st.Moves)
 			}
 		}
 		noted := make([]bool, len(moves))
@@ -223,13 +286,31 @@ func randomHistory(r *rand.Rand) string { return pick(r, everyMove, r.IntN(41)) 
 // randomRotations turns the Cube to face a random way.
 func randomRotations(r *rand.Rand) string { return pick(r, movesOf("xyz"), r.IntN(4)) }
 
-// crossKeepingMoves is a random sequence that keeps a white cross on top
-// whole: bottom-Layer Turns, y rotations and the corner trigger R' D' R D,
-// which takes the right edge out and puts it back.
-func crossKeepingMoves(r *rand.Rand) string {
+// keeping is up to 11 of the sequences in keep, picked at random.
+func keeping(r *rand.Rand, keep []string) string {
 	var parts []string
 	for range r.IntN(12) {
-		parts = append(parts, []string{"D", "D'", "D2", "y", "y'", "y2", "R' D' R D", "D' R' D R"}[r.IntN(8)])
+		parts = append(parts, keep[r.IntN(len(keep))])
 	}
-	return strings.Join(parts, " ")
+	return join(parts...)
+}
+
+// whiteUp is the Cube rotation, if any, that turns the white center to the
+// top.
+func whiteUp(c cube.Cube) string {
+	for _, turn := range []string{"", "x", "x'", "x2", "z", "z'"} {
+		if c.Apply(cube.MustParseMoves(turn)...)[cube.StickerAt(cube.U, 1, 1)] == cube.White {
+			return turn
+		}
+	}
+	panic("the Cube has no white center")
+}
+
+func cubeAfter(scramble, history string) cube.Cube {
+	return cube.Solved().Apply(cube.MustParseMoves(scramble + " " + history)...)
+}
+
+// join joins Move sequences in notation, leaving out empty ones.
+func join(notation ...string) string {
+	return strings.Join(slices.DeleteFunc(notation, func(s string) bool { return s == "" }), " ")
 }

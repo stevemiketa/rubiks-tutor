@@ -57,8 +57,8 @@ func TestSolveMakesTheWhiteCrossAsStage1(t *testing.T) {
 	const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
 	s := solve(t, newTestServer(t), scramble, "")
 
-	if s.Solved || len(s.Stages) != 1 {
-		t.Fatalf("got solved=%v with %d Stages, want just Stage 1", s.Solved, len(s.Stages))
+	if s.Solved || len(s.Stages) == 0 {
+		t.Fatalf("got solved=%v with %d Stages, want Stage 1 first", s.Solved, len(s.Stages))
 	}
 	st := s.Stages[0]
 	if st.ID != "white-cross" || st.Name != "White cross" ||
@@ -113,6 +113,91 @@ func TestSolveStartsByPuttingTheWhiteCenterOnTop(t *testing.T) {
 				t.Errorf("Stage 1 %q has Cube rotations after its first Turn", s.Stages[0].Moves)
 			}
 		})
+	}
+}
+
+func TestSolveFillsInTheWhiteCornersAsStage2(t *testing.T) {
+	const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
+	s := solve(t, newTestServer(t), scramble, "")
+	checkSolution(t, scramble, "", s)
+
+	if len(s.Stages) < 2 || s.Stages[1].ID != "white-corners" {
+		t.Fatalf("got Stages %v, want the white corners second", stageIDs(s))
+	}
+	st := s.Stages[1]
+	if st.Name != "White corners" || st.Goal != "Fill in the white corners to finish the first layer." {
+		t.Errorf("Stage 2 is %q %q", st.Name, st.Goal)
+	}
+	if !sameSet(st.Pieces, whiteCorners) {
+		t.Errorf("Stage 2 Pieces = %v, want the four white corners", st.Pieces)
+	}
+	if len(st.Algorithms) == 0 {
+		t.Fatal("Stage 2 uses no Algorithm")
+	}
+	for _, a := range st.Algorithms {
+		if a.Name != "Corner trigger" || a.Notation != "R' D' R D" {
+			t.Errorf("Stage 2 uses %q %q, want only the corner trigger R' D' R D", a.Name, a.Notation)
+		}
+	}
+	// White is already on top after Stage 1, so outside the corner trigger
+	// the Stage only rotates the Cube about y and turns the bottom Layer.
+	moves, inAlgorithm := st.moves(t), st.inAlgorithm(t)
+	for i, m := range moves {
+		if !inAlgorithm[i] && m.Letter != 'y' && m.Letter != 'D' {
+			t.Errorf("Stage 2 Move %d is %v, outside the corner trigger; want only y and D", i, m)
+		}
+	}
+
+	start := cube.Solved().Apply(cube.MustParseMoves(scramble + " " + s.Stages[0].Moves)...)
+	if end := start.Apply(moves...); !whiteLayerOnTop(end) {
+		t.Errorf("after Stage 2's Moves %q the Cube is %s, which has no white layer on top", st.Moves, end)
+	}
+}
+
+func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T) {
+	const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
+	s := solve(t, newTestServer(t), scramble, "")
+	checkSolution(t, scramble, "", s)
+
+	if len(s.Stages) < 3 || s.Stages[2].ID != "middle-edges" {
+		t.Fatalf("got Stages %v, want the middle layer third", stageIDs(s))
+	}
+	st := s.Stages[2]
+	if st.Name != "Middle layer" || st.Goal != "Flip white to the bottom, then place the four middle-layer edges." {
+		t.Errorf("Stage 3 is %q %q", st.Name, st.Goal)
+	}
+	if !sameSet(st.Pieces, middleEdges) {
+		t.Errorf("Stage 3 Pieces = %v, want the four middle-layer edges", st.Pieces)
+	}
+
+	start := cube.Solved().Apply(cube.MustParseMoves(scramble + " " + s.Stages[0].Moves + " " + s.Stages[1].Moves)...)
+	moves, inAlgorithm := st.moves(t), st.inAlgorithm(t)
+	if len(moves) == 0 || !moves[0].IsRotation() || inAlgorithm[0] || start.Apply(moves[0])[cube.StickerAt(cube.D, 1, 1)] != cube.White {
+		t.Fatalf("Stage 3 %q doesn't start with a Cube rotation that flips white to the bottom", st.Moves)
+	}
+	if len(st.Notes) == 0 || st.Notes[0].At != 0 {
+		t.Errorf("Stage 3's opening Cube rotation has no note: %v", st.Notes)
+	}
+
+	inserts := map[string]string{"Right insert": "U R U' R' U' F' U F", "Left insert": "U' L' U L U F U' F'"}
+	if len(st.Algorithms) == 0 {
+		t.Error("Stage 3 uses no Algorithm")
+	}
+	for _, a := range st.Algorithms {
+		if inserts[a.Name] != a.Notation {
+			t.Errorf("Stage 3 uses %q %q, want only the right and left inserts", a.Name, a.Notation)
+		}
+	}
+	// After the flip, outside the inserts the Stage only rotates the Cube
+	// about y and turns the top Layer.
+	for i, m := range moves[1:] {
+		if !inAlgorithm[i+1] && m.Letter != 'y' && m.Letter != 'U' {
+			t.Errorf("Stage 3 Move %d is %v, outside the inserts; want only y and U", i+1, m)
+		}
+	}
+
+	if end := start.Apply(moves...); !firstTwoLayersWhiteDown(end) {
+		t.Errorf("after Stage 3's Moves %q the Cube is %s, which doesn't have white down and the first two layers done", st.Moves, end)
 	}
 }
 
