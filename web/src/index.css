@@ -11,21 +11,6 @@ body {
   min-height: 100vh;
 }
 
-.page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  min-height: 100vh;
-  padding: 0 1rem;
-  text-align: center;
-}
-
-.page h1 {
-  margin: 0;
-}
-
 a {
   color: #8ab4ff;
 }

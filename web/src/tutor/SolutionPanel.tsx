@@ -89,8 +89,6 @@ export function SolutionPanel({
 
       {solution === undefined ? (
         status === 'idle' && <p className="muted">Stuck? Solve shows you the rest of the way, one Stage at a time.</p>
-      ) : solution.stages.length === 0 ? (
-        <p>Every Stage that Solve can show so far is already finished.</p>
       ) : (
         <>
           <StageList
