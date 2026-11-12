@@ -8,7 +8,11 @@
 // finished. The same Cube always gets the same Solution.
 package solver
 
-import "github.com/stevemiketa/rubiks-tutor/internal/cube"
+import (
+	"slices"
+
+	"github.com/stevemiketa/rubiks-tutor/internal/cube"
+)
 
 // Solution is what Solve returns: either Solved, or the Stages that solve the
 // Cube, in Method order.
@@ -61,8 +65,8 @@ type stageSpec struct {
 	solve func(b *builder)
 }
 
-// method lists the Method's Stages in order. Stages 2-7 slot in here.
-var method = []stageSpec{whiteCross}
+// method lists the Method's Stages in order. Stages 4-7 slot in here.
+var method = []stageSpec{whiteCross, whiteCorners, middleEdges}
 
 // Solve returns the Solution for a Cube.
 func Solve(c cube.Cube) Solution {
@@ -102,13 +106,72 @@ func (b *builder) move(m cube.Move, note string) {
 	b.cube = b.cube.Apply(m)
 }
 
+// algorithm is one of the Method's named Algorithms.
+type algorithm struct {
+	name  string
+	moves []cube.Move
+}
+
+func newAlgorithm(name, notation string) algorithm {
+	return algorithm{name: name, moves: cube.MustParseMoves(notation)}
+}
+
+// use appends one use of an Algorithm: its Moves, which get no notes, and a
+// record of where in the Stage's Moves they start.
+func (b *builder) use(a algorithm) {
+	b.algorithms = append(b.algorithms, AlgorithmUse{Name: a.name, Moves: slices.Clone(a.moves), Start: len(b.steps)})
+	for _, m := range a.moves {
+		b.steps = append(b.steps, Step{Move: m})
+	}
+	b.cube = b.cube.Apply(a.moves...)
+}
+
+// setUp appends the one Move of a letter, if any, that makes ready hold:
+// none, a clockwise, a counterclockwise or a half Move, the first that works.
+// Stages set up their Algorithms with it.
+func (b *builder) setUp(letter cube.Letter, ready func(cube.Cube) bool, note string) {
+	if ready(b.cube) {
+		return
+	}
+	for _, amount := range []cube.Amount{cube.Clockwise, cube.Counterclockwise, cube.Half} {
+		if m := (cube.Move{Letter: letter, Amount: amount}); ready(b.cube.Apply(m)) {
+			b.move(m, note)
+			return
+		}
+	}
+	panic("solver: no " + string(rune(letter)) + " Move sets up " + note)
+}
+
+// cheapest returns the index of the item for which do appends the fewest
+// Moves, starting from b.cube, or the first of them on a tie. b is left as it
+// was. Stages use it to do the easiest Piece next.
+func cheapest[T any](b *builder, items []T, do func(*builder, T)) int {
+	best, bestCost := -1, 0
+	for i, item := range items {
+		trial := &builder{cube: b.cube}
+		do(trial, item)
+		if cost := len(trial.steps); best < 0 || cost < bestCost {
+			best, bestCost = i, cost
+		}
+	}
+	return best
+}
+
 // putWhiteOnTop appends the Cube rotations, if any, that bring the white
-// center to the top. The first Stage that isn't skipped starts with it.
-func putWhiteOnTop(b *builder) {
-	for _, m := range whiteUpRotations(b.cube) {
-		note := "rotate the Cube so the white center is on top"
+// center to the top. Stages 1 and 2 start with it, so the first of them that
+// isn't skipped turns white to the top.
+func putWhiteOnTop(b *builder) { putWhite(b, whiteUpFrom, "on top") }
+
+// putWhiteOnBottom appends the Cube rotations, if any, that bring the white
+// center to the bottom. Stage 3 and later start with it: after Stage 2 it is
+// the x2 that turns the Cube over.
+func putWhiteOnBottom(b *builder) { putWhite(b, whiteDownFrom, "on the bottom") }
+
+func putWhite(b *builder, from [6]string, where string) {
+	for _, m := range whiteRotations(b.cube, from) {
+		note := "rotate the Cube so the white center is " + where
 		if m.Amount == cube.Half {
-			note = "turn the Cube over so the white center is on top"
+			note = "turn the Cube over so the white center is " + where
 		}
 		b.move(m, note)
 	}
@@ -116,15 +179,22 @@ func putWhiteOnTop(b *builder) {
 
 // whiteUpRotations returns the Cube rotations that bring the white center
 // from wherever it is to the top: none, or one of x, x', x2, z, z'.
-func whiteUpRotations(c cube.Cube) []cube.Move {
+func whiteUpRotations(c cube.Cube) []cube.Move { return whiteRotations(c, whiteUpFrom) }
+
+// whiteRotations returns the Cube rotation that from gives for the face
+// holding the white center.
+func whiteRotations(c cube.Cube, from [6]string) []cube.Move {
 	for f := cube.U; f <= cube.B; f++ {
 		if c[cube.StickerAt(f, 1, 1)] == cube.White {
-			return cube.MustParseMoves(whiteUpFrom[f])
+			return cube.MustParseMoves(from[f])
 		}
 	}
 	panic("solver: the Cube has no white center")
 }
 
-// whiteUpFrom gives, for the face holding the white center, the Cube
-// rotation that turns that face to the top.
-var whiteUpFrom = [6]string{cube.U: "", cube.D: "x2", cube.F: "x", cube.B: "x'", cube.R: "z'", cube.L: "z"}
+// whiteUpFrom and whiteDownFrom give, for the face holding the white center,
+// the Cube rotation that turns that face to the top or to the bottom.
+var (
+	whiteUpFrom   = [6]string{cube.U: "", cube.D: "x2", cube.F: "x", cube.B: "x'", cube.R: "z'", cube.L: "z"}
+	whiteDownFrom = [6]string{cube.U: "x2", cube.D: "", cube.F: "x'", cube.B: "x", cube.R: "z", cube.L: "z'"}
+)

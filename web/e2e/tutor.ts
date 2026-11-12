@@ -35,6 +35,9 @@ export const scramble = (page: Page): Locator =>
 /** The Solution panel: the Solve button, the Stage list and Playback. */
 export const solutionPanel = (page: Page): Locator => page.getByRole('region', { name: 'Solution' })
 
-/** Each Stage in the loaded Solution's Stage list, by name. */
+/** Each Stage in the loaded Solution's Stage list, by name: the buttons that jump to it. */
 export const stages = (page: Page): Locator =>
-  solutionPanel(page).getByRole('list', { name: 'Stages' }).getByRole('listitem')
+  solutionPanel(page).getByRole('list', { name: 'Stages' }).getByRole('button')
+
+/** Playback's progress through the loaded Solution, as the Solution panel shows it. */
+export const progress = (page: Page): Locator => solutionPanel(page).getByText(/^\d+ of \d+ Moves played$/)
