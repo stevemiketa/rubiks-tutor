@@ -94,8 +94,8 @@ They need a user who may create schemas: each test works in a new schema, which 
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
 | `web/src/cube/` | The TypeScript cube model, the same as the Go one |
-| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, sharing and opening Snapshots, and `Tutor`, which the tutor page reads |
-| `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
+| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, what Playback teaches at each position (the Stage, the Algorithm being performed, and each Move's note), sharing and opening Snapshots, and `Tutor`, which the tutor page reads |
+| `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves and can highlight some Pieces and dim the rest; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |
 | `web/src/routing/` | Client-side routing between the splash page and the tutor |

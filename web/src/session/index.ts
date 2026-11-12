@@ -26,6 +26,7 @@ export {
   type SolveResult,
   type Stage,
 } from './solution.ts'
+export { algorithmsOf, type Algorithm, type AlgorithmStep, type Teaching } from './teaching.ts'
 export { SessionStore, browserStorage, type StorageLike } from './sessionStore.ts'
 export type { Opening, SharedSnapshot, Sharing, SnapshotClient } from './sharing.ts'
 export { snapshotApi } from './snapshotClient.ts'

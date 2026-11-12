@@ -56,6 +56,8 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               onSelect={(sticker) => tutor.select(sticker)}
               selectable={isSelectable}
               onRotate={(rotations) => tutor.recordDrag(rotations)}
+              // The Pieces of the Stage Playback is in, until the Cube is solved.
+              highlighted={solved ? undefined : session.teaching?.stage.pieces}
               label="The Cube, seen from the front, top and right"
             />
             <div className="tutor-status">
