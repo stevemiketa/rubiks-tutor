@@ -1,0 +1,19 @@
+import { useSyncExternalStore } from 'react'
+
+const QUERY = '(prefers-reduced-motion: reduce)'
+
+function subscribe(onChange: () => void): () => void {
+  const list = window.matchMedia(QUERY)
+  list.addEventListener('change', onChange)
+  return () => list.removeEventListener('change', onChange)
+}
+
+const prefersReducedMotion = (): boolean => window.matchMedia(QUERY).matches
+
+/**
+ * Whether the visitor has asked for reduced motion, kept current if they
+ * change the setting while the page is open.
+ */
+export function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(subscribe, prefersReducedMotion)
+}

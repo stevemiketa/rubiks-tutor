@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { Sticker } from '../cube/index.ts'
 import type { MoveQueue, QueuedMove } from '../session/index.ts'
 import { CubeModel } from './cubeModel.ts'
+import { NoWebGL, WebGLGate } from './webgl.tsx'
 
 /** Where the fixed camera sits, looking at the Cube's center. */
 const CAMERA = { position: [5, 4.6, 7.6] as const, fov: 37 }
@@ -24,7 +25,16 @@ export interface CubeViewProps {
   readonly className?: string
 }
 
-export function CubeView({ queue, selected, onSelect, selectable, label, className }: CubeViewProps) {
+/** The 3D Cube, or an explanation in its place when the browser can't render WebGL. */
+export function CubeView(props: CubeViewProps) {
+  return (
+    <WebGLGate fallback={<NoWebGL className={['cube-view', props.className].filter(Boolean).join(' ')} />}>
+      <CubeCanvas {...props} />
+    </WebGLGate>
+  )
+}
+
+function CubeCanvas({ queue, selected, onSelect, selectable, label, className }: CubeViewProps) {
   return (
     <div className={['cube-view', className].filter(Boolean).join(' ')} role="img" aria-label={label}>
       {/* flat: no tone mapping, so the Stickers keep their true colors. */}
