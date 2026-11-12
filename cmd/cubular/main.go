@@ -149,7 +149,7 @@ func serverConfig(getenv func(string) string) (server.Config, error) {
 		cfg.TrustedProxies = append(cfg.TrustedProxies, prefix.Masked())
 	}
 
-	cfg.ShareLimit = server.DefaultShareLimit
+	// A limit left unset stays zero, which server.New reads as its default.
 	if v := getenv("SHARE_LIMIT_PER_HOUR"); v != "" {
 		perHour, err := strconv.ParseFloat(v, 64)
 		if err != nil || !(perHour > 0) {

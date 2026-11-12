@@ -137,3 +137,101 @@ func (c Cube) Locate(piece string) (Location, error) {
 	}
 	return Location{}, fmt.Errorf("cube: Piece %q is not on this Cube", piece)
 }
+
+// The rest of this file is for the Go solver only. None of it changes Moves
+// or notation, so the TypeScript model has no twin of it (ADR 0002).
+
+// MustSlot returns the Slot with this name, such as "UFR". It panics if there
+// is none, so use it for Slots named in source, as MustParseMoves is for
+// Moves.
+func MustSlot(name string) Slot {
+	s, ok := slotByName(name)
+	if !ok {
+		panic(fmt.Sprintf("cube: unknown Slot %q", name))
+	}
+	s.Stickers = slices.Clone(s.Stickers)
+	return s
+}
+
+// Piece is one of the 26 Pieces, known by its colors.
+type Piece struct {
+	Name   string  // as PieceNames gives it, such as "white-green-red corner"
+	Colors []Color // its Stickers' colors, in Color order, as Name lists them
+}
+
+// Pieces returns all 26 Pieces, in Slots order, as PieceNames names them.
+func Pieces() []Piece {
+	solved := Solved()
+	pieces := make([]Piece, len(slots))
+	for i, slot := range slots {
+		colors := solved.colorsAt(slot)
+		slices.Sort(colors)
+		pieces[i] = Piece{Name: pieceNames[i], Colors: colors}
+	}
+	return pieces
+}
+
+// Has reports whether one of the Piece's Stickers is color c.
+func (p Piece) Has(c Color) bool { return slices.Contains(p.Colors, c) }
+
+// IsEdge reports whether the Piece is an edge, with two Stickers.
+func (p Piece) IsEdge() bool { return len(p.Colors) == 2 }
+
+// IsCorner reports whether the Piece is a corner, with three Stickers.
+func (p Piece) IsCorner() bool { return len(p.Colors) == 3 }
+
+// PieceName names the Piece with these colors, given in any order, such as
+// "white-green-red corner".
+func PieceName(colors ...Color) string { return pieceName(colors) }
+
+// Center returns the color of the center Sticker on face f.
+func (c Cube) Center(f Face) Color { return c[StickerAt(f, 1, 1)] }
+
+// InPlace reports whether the Piece in Slot s is in place: each of its
+// Stickers matches the center of the face it is on. The centers say where
+// every Piece belongs, whichever way the Cube faces.
+func (c Cube) InPlace(s Slot) bool {
+	for _, st := range s.Stickers {
+		if c[st] != c.Center(st.Face()) {
+			return false
+		}
+	}
+	return true
+}
+
+// Holds reports whether Slot s holds the Piece with these colors, however it
+// is twisted.
+func (c Cube) Holds(s Slot, colors ...Color) bool {
+	return len(s.Stickers) == len(colors) && sameColors(len(colors), func(i int) Color { return c[s.Stickers[i]] }, colors)
+}
+
+// BelongsAt reports whether the Piece with these colors belongs in Slot s:
+// the centers of the faces s touches have its colors.
+func (c Cube) BelongsAt(s Slot, colors ...Color) bool {
+	return len(s.Stickers) == len(colors) &&
+		sameColors(len(colors), func(i int) Color { return c.Center(s.Stickers[i].Face()) }, colors)
+}
+
+// sameColors reports whether each of the n colors color gives is one of
+// colors.
+func sameColors(n int, color func(int) Color, colors []Color) bool {
+	for i := range n {
+		if !slices.Contains(colors, color(i)) {
+			return false
+		}
+	}
+	return true
+}
+
+// SlotOf returns the Slot that holds the Piece with these colors, given in
+// any order. ok is false if none does, which only happens for colors that
+// name no Piece, or a state no Moves can reach.
+func (c Cube) SlotOf(colors ...Color) (s Slot, ok bool) {
+	for _, slot := range slots {
+		if c.Holds(slot, colors...) {
+			slot.Stickers = slices.Clone(slot.Stickers)
+			return slot, true
+		}
+	}
+	return Slot{}, false
+}
