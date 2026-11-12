@@ -18,10 +18,9 @@ import {
 import { PAINT, PLASTIC, STICKER_SIZE } from './look.ts'
 
 /**
- * How far a dimmed Piece's Stickers fade toward this color, the Cube's
- * background: enough to step back, not so far that their colors are lost.
+ * How far a dimmed Piece's Stickers fade toward the Cube's background:
+ * enough to step back, not so far that their colors are lost.
  */
-const DIM_TOWARD = '#11131a'
 const DIM_AMOUNT = 0.8
 
 /** The selection marker's color: unlike any Sticker, and bright on black. */
@@ -78,14 +77,15 @@ export class CubeModel extends THREE.Group {
   readonly #stickers: THREE.Mesh[] = []
   readonly #marker: THREE.Mesh
   readonly #paints: Readonly<Record<Color, THREE.Material>>
-  readonly #dimPaints: Readonly<Record<Color, THREE.Material>>
+  readonly #dimPaints: Readonly<Record<Color, THREE.MeshStandardMaterial>>
   // The Cube state drawn, and the Pieces highlighted (by name), if any are.
   #cube: Cube | undefined
   #highlighted: ReadonlySet<string> | undefined
   readonly #disposables: { dispose(): void }[] = []
   #turn: { axis: THREE.Vector3; angle: number } | undefined
 
-  constructor() {
+  /** The Cube, with dimmed Pieces fading toward background, the color behind it. */
+  constructor(background: THREE.ColorRepresentation) {
     super()
     this.name = 'Cube'
 
@@ -93,14 +93,14 @@ export class CubeModel extends THREE.Group {
     const plastic = new THREE.MeshStandardMaterial({ color: PLASTIC, roughness: 0.55 })
     const sticker = new THREE.ShapeGeometry(roundedSquare(STICKER_SIZE, 0.09))
     const paints = {} as Record<Color, THREE.Material>
-    const dimPaints = {} as Record<Color, THREE.Material>
+    const dimPaints = {} as Record<Color, THREE.MeshStandardMaterial>
     for (const c of COLORS) {
       paints[c] = new THREE.MeshStandardMaterial({ color: PAINT[c], roughness: 0.4 })
-      const dim = new THREE.Color(PAINT[c]).lerp(new THREE.Color(DIM_TOWARD), DIM_AMOUNT)
-      dimPaints[c] = new THREE.MeshStandardMaterial({ color: dim, roughness: 0.6 })
+      dimPaints[c] = new THREE.MeshStandardMaterial({ roughness: 0.6 })
     }
     this.#paints = paints
     this.#dimPaints = dimPaints
+    this.fadeToward(background)
 
     for (const slot of SLOTS) {
       const piece = new THREE.Group()
@@ -162,6 +162,16 @@ export class CubeModel extends THREE.Group {
   highlight(pieces: readonly string[] | undefined): void {
     this.#highlighted = pieces && new Set(pieces)
     this.#paint()
+  }
+
+  /**
+   * Fades dimmed Pieces toward this color: the background behind the Cube,
+   * which changes with the theme. It takes effect at once, even mid-Move,
+   * and changes nothing else.
+   */
+  fadeToward(background: THREE.ColorRepresentation): void {
+    const toward = new THREE.Color(background)
+    for (const c of COLORS) this.#dimPaints[c].color.set(PAINT[c]).lerp(toward, DIM_AMOUNT)
   }
 
   // Paints each Sticker its color in the Cube state drawn, dimmed unless its
