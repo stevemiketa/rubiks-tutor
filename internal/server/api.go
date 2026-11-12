@@ -8,12 +8,14 @@ import (
 	"net/http"
 
 	"github.com/stevemiketa/rubiks-tutor/internal/cube"
+	"github.com/stevemiketa/rubiks-tutor/internal/snapshot"
 )
 
 const (
-	// maxMoves caps the Moves in one request: Scramble and Move history
-	// together.
-	maxMoves = 10_000
+	// maxMoves caps the Moves in one request, Scramble and Move history
+	// together, at what a Snapshot holds: any Session that can be solved
+	// can be shared, and the other way round.
+	maxMoves = snapshot.MaxMoves
 	// maxBodyBytes caps a request body. maxMoves Moves in notation take at
 	// most 3 bytes each ("R2 "), so this leaves room for JSON and whitespace.
 	maxBodyBytes = 64 << 10

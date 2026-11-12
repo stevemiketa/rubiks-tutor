@@ -1,8 +1,6 @@
 package solver
 
 import (
-	"strings"
-
 	"github.com/stevemiketa/rubiks-tutor/internal/cube"
 )
 
@@ -14,12 +12,10 @@ import (
 // or twisted in its own, is first rotated to front-right: one corner trigger
 // takes it out, and repeating it twists one in its place round.
 var whiteCorners = stageSpec{
-	id:   "white-corners",
-	name: "White corners",
-	goal: "Fill in the white corners to finish the first layer.",
-	pieces: pieceNamesWhere(func(name string) bool {
-		return strings.HasPrefix(name, "white-") && strings.HasSuffix(name, " corner")
-	}),
+	id:       "white-corners",
+	name:     "White corners",
+	goal:     "Fill in the white corners to finish the first layer.",
+	pieces:   pieceNamesWhere(func(p cube.Piece) bool { return p.IsCorner() && p.Has(cube.White) }),
 	finished: func(c cube.Cube) bool { return firstLayerOnTop(c.Apply(whiteUpRotations(c)...)) },
 	solve:    solveWhiteCorners,
 }
@@ -35,7 +31,7 @@ func solveWhiteCorners(b *builder) {
 	putWhiteOnTop(b)
 	todo := [][2]cube.Color{}
 	for _, pair := range sidePairs {
-		if !inPlace(b.cube, where(b.cube, whiteCorner(pair))) {
+		if !b.cube.InPlace(where(b.cube, whiteCorner(pair)...)) {
 			todo = append(todo, pair)
 		}
 	}
@@ -52,30 +48,30 @@ func whiteCorner(pair [2]cube.Color) []cube.Color { return []cube.Color{cube.Whi
 // with white on top, leaving the rest of the top layer as it was.
 func insertWhiteCorner(b *builder, pair [2]cube.Color) {
 	colors := whiteCorner(pair)
-	name := "white-" + colorNames(pair[0], pair[1]) + " corner"
-	frontRight, belowFrontRight := slot("UFR"), slot("DFR")
-	placeAtFrontRight := func(c cube.Cube) bool { return belongsAt(c, frontRight, colors) }
+	name := cube.PieceName(colors...)
+	frontRight, belowFrontRight := slotUFR, slotDFR
+	placeAtFrontRight := func(c cube.Cube) bool { return c.BelongsAt(frontRight, colors...) }
 
-	if at := where(b.cube, colors); at.Position[1] == 1 {
+	if at := where(b.cube, colors...); at.Position[1] == 1 {
 		note := "rotate so the " + name + " is at front-right, to take it out of the wrong place"
-		if belongsAt(b.cube, at, colors) {
+		if b.cube.BelongsAt(at, colors...) {
 			note = "rotate so the " + name + ", twisted in its place, is at front-right"
 		}
-		b.setUp('y', func(c cube.Cube) bool { return holds(c, frontRight, colors) }, note)
+		b.setUp('y', func(c cube.Cube) bool { return c.Holds(frontRight, colors...) }, note)
 		if !placeAtFrontRight(b.cube) {
 			b.use(cornerTrigger) // takes it down to the bottom layer
 		}
 	}
 	b.setUp('y', placeAtFrontRight, "rotate so the "+name+"'s place is at front-right")
-	b.setUp('D', func(c cube.Cube) bool { return holds(c, belowFrontRight, colors) || holds(c, frontRight, colors) },
+	b.setUp('D', func(c cube.Cube) bool { return c.Holds(belowFrontRight, colors...) || c.Holds(frontRight, colors...) },
 		"turn the bottom so the "+name+" is below its place")
 	for range 5 {
-		if inPlace(b.cube, frontRight) {
+		if b.cube.InPlace(frontRight) {
 			return
 		}
 		b.use(cornerTrigger)
 	}
-	if !inPlace(b.cube, frontRight) {
+	if !b.cube.InPlace(frontRight) {
 		panic("solver: the corner trigger did not put the " + name + " in place")
 	}
 }

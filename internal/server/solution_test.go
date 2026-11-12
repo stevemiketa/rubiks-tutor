@@ -10,7 +10,7 @@ import (
 	"github.com/stevemiketa/rubiks-tutor/internal/cube"
 )
 
-// What the solve tests share: the response body as a client reads it, and
+// What the Solve tests share: the response body as a client reads it, and
 // the Stage goals, checked with the Go cube model.
 
 type solutionBody struct {

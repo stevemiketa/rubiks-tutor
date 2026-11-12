@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Cube, formatMoves, invert, isRotation, type Move } from '../cube/index.ts'
-import { SPLASH_SCRAMBLE, SPLASH_SOLVE } from './recording.ts'
+import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
 const SOLVED = 'WWWWWWWWW RRRRRRRRR GGGGGGGGG YYYYYYYYY OOOOOOOOO BBBBBBBBB'
 const OUTER = new Set(['R', 'L', 'U', 'D', 'F', 'B'])
@@ -27,12 +27,12 @@ describe('the splash page recording', () => {
   })
 
   it('solves the scrambled Cube back to the exact Cube it started from, so the loop restarts without a jump', () => {
-    const end = Cube.solved().apply([...SPLASH_SCRAMBLE, ...SPLASH_SOLVE])
+    const end = Cube.solved().apply([...SPLASH_SCRAMBLE, ...SPLASH_SOLUTION])
     expect(end.toString()).toBe(SOLVED)
   })
 
   it('solves the Cube rather than playing the scramble backwards', () => {
     const turns = (ms: readonly Move[]) => formatMoves(ms.filter((m) => !isRotation(m)))
-    expect(turns(SPLASH_SOLVE)).not.toBe(formatMoves(invert(SPLASH_SCRAMBLE)))
+    expect(turns(SPLASH_SOLUTION)).not.toBe(formatMoves(invert(SPLASH_SCRAMBLE)))
   })
 })

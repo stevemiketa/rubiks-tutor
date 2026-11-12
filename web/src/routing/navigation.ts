@@ -26,7 +26,8 @@ function currentPathname(): string {
   return window.location.pathname
 }
 
-export function useRoute(): Route {
+/** The page the address bar points at, or undefined for a path no page has: see parseRoute. */
+export function useRoute(): Route | undefined {
   const pathname = useSyncExternalStore(subscribe, currentPathname)
   return useMemo(() => parseRoute(pathname), [pathname])
 }

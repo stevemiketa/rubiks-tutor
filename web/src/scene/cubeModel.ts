@@ -15,16 +15,7 @@ import {
   type Sticker,
   type Vec,
 } from '../cube/index.ts'
-
-/** The standard scheme's colors as drawn. */
-const PAINT: Readonly<Record<Color, string>> = {
-  white: '#f4f5f7',
-  yellow: '#ffd400',
-  green: '#00a650',
-  blue: '#0b5fd3',
-  red: '#c8102e',
-  orange: '#ff6a00',
-}
+import { PAINT, PLASTIC, STICKER_SIZE } from './look.ts'
 
 /**
  * How far a dimmed Piece's Stickers fade toward this color, the Cube's
@@ -39,7 +30,6 @@ const MARKER_COLOR = '#ff3fd2'
 // Pieces sit on a grid of unit spacing; each is a little smaller, so a black
 // gap shows between them.
 const PIECE_SIZE = 0.95
-const STICKER_SIZE = 0.8
 const STICKER_LIFT = PIECE_SIZE / 2 + 0.002
 const MARKER_LIFT = PIECE_SIZE / 2 + 0.006
 
@@ -100,7 +90,7 @@ export class CubeModel extends THREE.Group {
     this.name = 'Cube'
 
     const body = new RoundedBoxGeometry(PIECE_SIZE, PIECE_SIZE, PIECE_SIZE, 3, 0.08)
-    const plastic = new THREE.MeshStandardMaterial({ color: '#16181d', roughness: 0.55 })
+    const plastic = new THREE.MeshStandardMaterial({ color: PLASTIC, roughness: 0.55 })
     const sticker = new THREE.ShapeGeometry(roundedSquare(STICKER_SIZE, 0.09))
     const paints = {} as Record<Color, THREE.Material>
     const dimPaints = {} as Record<Color, THREE.Material>

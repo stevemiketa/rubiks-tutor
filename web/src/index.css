@@ -11,21 +11,6 @@ body {
   min-height: 100vh;
 }
 
-.page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  min-height: 100vh;
-  padding: 0 1rem;
-  text-align: center;
-}
-
-.page h1 {
-  margin: 0;
-}
-
 a {
   color: #8ab4ff;
 }
@@ -203,6 +188,13 @@ a {
   width: 100%;
   max-width: calc(100vh - 6rem);
   margin: 0 auto;
+}
+
+/* The still picture fills the same square the 3D view would. */
+.cube-picture svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .tutor-status {

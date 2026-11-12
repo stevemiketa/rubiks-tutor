@@ -68,6 +68,19 @@ test.describe('under reduced motion', () => {
     await page.getByRole('link', { name: 'Start solving' }).click()
     await expect(page.getByRole('heading', { name: 'Tutor' })).toBeVisible()
   })
+
+  test('the still image is a picture, not a 3D view, so it shows without WebGL too', async ({ page }) => {
+    const requests: URL[] = []
+    page.on('request', (request) => requests.push(new URL(request.url())))
+    await page.addInitScript({ content: WITHOUT_WEBGL })
+    await page.goto('/')
+
+    await expect(cubeView(page)).toBeVisible()
+    await expect(cubeView(page).locator('canvas')).toHaveCount(0)
+    await expect(page.getByText(NO_WEBGL_EXPLANATION)).toHaveCount(0)
+    // Drawn in the page, not fetched.
+    expect(requests.filter((url) => /\.(png|jpe?g|webp|gif|svg)$/.test(url.pathname)).map(String)).toEqual([])
+  })
 })
 
 test.describe('without WebGL', () => {

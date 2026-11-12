@@ -5,3 +5,5 @@ Snapshot storage sits behind one `SnapshotStore` interface with two implementati
 ## Consequences
 
 The two implementations can behave differently in small ways, such as how each reports a duplicate ID, so both must pass the same store test suite.
+
+As built, the one interface is `snapshot.Store`, and it is implemented by one SQL store (`internal/store`) with a dialect per database rather than by two separate stores. The databases still differ where the decision expected, so the store suite (`internal/snapshot/storetest`) runs against the store on both SQLite and Postgres.

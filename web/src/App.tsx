@@ -1,5 +1,4 @@
 import { AnimatePresence } from 'motion/react'
-import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { SplashPage } from './pages/SplashPage.tsx'
 import { TutorPage } from './pages/TutorPage.tsx'
 import { useRoute } from './routing/navigation.ts'
@@ -9,7 +8,7 @@ import type { Route } from './routing/route.ts'
 // next page appears.
 export function App() {
   const route = useRoute()
-  return <AnimatePresence mode="wait">{page(route)}</AnimatePresence>
+  return <AnimatePresence mode="wait">{route && page(route)}</AnimatePresence>
 }
 
 function page(route: Route) {
@@ -18,7 +17,5 @@ function page(route: Route) {
       return <SplashPage key="splash" />
     case 'tutor':
       return <TutorPage key="tutor" snapshotId={route.snapshotId} />
-    case 'not-found':
-      return <NotFoundPage key="not-found" />
   }
 }

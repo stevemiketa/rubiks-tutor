@@ -8,8 +8,9 @@ import { AlgorithmCards, ReachedMove } from './Teaching.tsx'
  * The Solve button and, once a Solution is loaded, its Stages, each with its
  * goal, its Algorithm cards and its Moves in notation, the Move Playback has
  * reached with its note, the Playback controls, and a button that closes it.
- * Also says when the Cube is already solved, offers a retry when Solve fails,
- * and offers to solve again once a Turn has made the Solution stale.
+ * Also says when the Cube is already solved, offers a retry when Solve fails
+ * in a way trying again may fix, says why when it can't, and offers to solve
+ * again once a Turn has made the Solution stale.
  */
 export function SolutionPanel({
   session,
@@ -65,6 +66,17 @@ export function SolutionPanel({
           </button>
         </div>
       )}
+      {/* Trying again with the same Session can't help, so there is no Retry. */}
+      {(status === 'too-many-moves' || status === 'rejected') && (
+        <div className="solve-error" role="alert">
+          <p>
+            {status === 'too-many-moves'
+              ? 'Solve can take at most 10,000 Moves, the Scramble’s included, and this Session has more.'
+              : 'The solver couldn’t take this Session, and trying again won’t change that.'}{' '}
+            Start a new scramble to use Solve again.
+          </p>
+        </div>
+      )}
 
       {stale && (
         <div className="stale-solution" role="alert">
@@ -77,8 +89,6 @@ export function SolutionPanel({
 
       {solution === undefined ? (
         status === 'idle' && <p className="muted">Stuck? Solve shows you the rest of the way, one Stage at a time.</p>
-      ) : solution.stages.length === 0 ? (
-        <p>Every Stage that Solve can show so far is already finished.</p>
       ) : (
         <>
           <StageList

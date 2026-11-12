@@ -1,8 +1,6 @@
 package solver
 
 import (
-	"strings"
-
 	"github.com/stevemiketa/rubiks-tutor/internal/cube"
 )
 
@@ -28,13 +26,10 @@ var yellowCross = stageSpec{
 var edgeFlip = newAlgorithm("Edge flip", "F R U R' U' F'")
 
 // yellowEdgeNames and yellowCornerNames name the last layer's Pieces.
-var yellowEdgeNames, yellowCornerNames = yellowPieces(" edge"), yellowPieces(" corner")
-
-func yellowPieces(kind string) []string {
-	return pieceNamesWhere(func(name string) bool {
-		return strings.HasPrefix(name, "yellow-") && strings.HasSuffix(name, kind)
-	})
-}
+var (
+	yellowEdgeNames   = pieceNamesWhere(func(p cube.Piece) bool { return p.IsEdge() && p.Has(cube.Yellow) })
+	yellowCornerNames = pieceNamesWhere(func(p cube.Piece) bool { return p.IsCorner() && p.Has(cube.Yellow) })
+)
 
 // lastLayerFinished returns a Stage's finished check for a last-layer Stage:
 // with white turned to the bottom, the first two layers are done and done
@@ -47,18 +42,18 @@ func lastLayerFinished(done func(cube.Cube) bool) func(cube.Cube) bool {
 }
 
 var (
-	topEdges   = []string{"UF", "UR", "UB", "UL"}
-	topCorners = []string{"UFR", "UFL", "UBR", "UBL"}
+	topEdges   = []cube.Slot{slotUF, slotUR, slotUB, slotUL}
+	topCorners = []cube.Slot{slotUFR, slotUFL, slotUBR, slotUBL}
 )
 
-// yellowUp reports whether every top Slot named has yellow facing up.
-func yellowUp(c cube.Cube, names ...string) bool { return countYellowUp(c, names) == len(names) }
+// yellowUp reports whether each of these top Slots has yellow facing up.
+func yellowUp(c cube.Cube, slots ...cube.Slot) bool { return countYellowUp(c, slots) == len(slots) }
 
-// countYellowUp counts the top Slots named that have yellow facing up.
-func countYellowUp(c cube.Cube, names []string) int {
+// countYellowUp counts the top Slots among slots that have yellow facing up.
+func countYellowUp(c cube.Cube, slots []cube.Slot) int {
 	n := 0
-	for _, name := range names {
-		if c[slot(name).Stickers[0]] == cube.Yellow {
+	for _, s := range slots {
+		if c[s.Stickers[0]] == cube.Yellow {
 			n++
 		}
 	}
@@ -75,11 +70,11 @@ func solveYellowCross(b *builder) {
 			return
 		}
 		if countYellowUp(c, topEdges) == 2 {
-			if yellowUp(c, "UF", "UB") || yellowUp(c, "UL", "UR") {
-				b.setUp('U', func(c cube.Cube) bool { return yellowUp(c, "UL", "UR") },
+			if yellowUp(c, slotUF, slotUB) || yellowUp(c, slotUL, slotUR) {
+				b.setUp('U', func(c cube.Cube) bool { return yellowUp(c, slotUL, slotUR) },
 					"turn the top so the yellow line goes from left to right")
 			} else {
-				b.setUp('U', func(c cube.Cube) bool { return yellowUp(c, "UB", "UL") },
+				b.setUp('U', func(c cube.Cube) bool { return yellowUp(c, slotUB, slotUL) },
 					"turn the top so the yellow L is at the back and left")
 			}
 		}
@@ -111,7 +106,7 @@ func yellowFaceOnTop(c cube.Cube) bool { return yellowCrossOnTop(c) && yellowUp(
 // frontLeftYellowOn reports whether the front-left corner's yellow Sticker
 // is on face f.
 func frontLeftYellowOn(c cube.Cube, f cube.Face) bool {
-	for _, st := range slot("UFL").Stickers {
+	for _, st := range slotUFL.Stickers {
 		if st.Face() == f {
 			return c[st] == cube.Yellow
 		}
@@ -166,11 +161,11 @@ var aPerm = newAlgorithm("A-perm", "R' F R' B2 R F' R' B2 R2")
 // counterclockwise or a half Turn, in the order setUp tries them.
 var topTurns = [][]cube.Move{nil, cube.MustParseMoves("U"), cube.MustParseMoves("U'"), cube.MustParseMoves("U2")}
 
-// topInPlace counts the Pieces in the top Slots named that are in place.
-func topInPlace(c cube.Cube, names []string) int {
+// topInPlace counts the Pieces in these top Slots that are in place.
+func topInPlace(c cube.Cube, slots []cube.Slot) int {
 	n := 0
-	for _, name := range names {
-		if inPlace(c, slot(name)) {
+	for _, s := range slots {
+		if c.InPlace(s) {
 			n++
 		}
 	}
@@ -207,15 +202,14 @@ func cycleCorners(b *builder, turn []cube.Move) {
 	c := b.cube.Apply(turn...)
 	var name string
 	for _, s := range topCorners {
-		if inPlace(c, slot(s)) {
-			name, _ = c.PieceAt(s)
+		if c.InPlace(s) {
+			name, _ = c.PieceAt(s.Name)
 		}
 	}
 	for _, m := range turn {
 		b.move(m, "turn the top so the "+name+" is in place")
 	}
-	frontLeft := slot("UFL")
-	b.setUp('y', func(c cube.Cube) bool { p, _ := c.PieceAt(frontLeft.Name); return p == name },
+	b.setUp('y', func(c cube.Cube) bool { p, _ := c.PieceAt(slotUFL.Name); return p == name },
 		"rotate so the "+name+", which is in place, is at front-left")
 	for range 2 {
 		if topInPlace(b.cube, topCorners) == 4 {
@@ -254,11 +248,11 @@ func solveYellowEdges(b *builder) {
 	}
 	var name string
 	for _, s := range topEdges {
-		if inPlace(b.cube, slot(s)) {
-			name, _ = b.cube.PieceAt(s)
+		if b.cube.InPlace(s) {
+			name, _ = b.cube.PieceAt(s.Name)
 		}
 	}
-	b.setUp('y', func(c cube.Cube) bool { p, _ := c.PieceAt("UB"); return p == name },
+	b.setUp('y', func(c cube.Cube) bool { p, _ := c.PieceAt(slotUB.Name); return p == name },
 		"rotate so the "+name+", which is in place, is at the back")
 	for range 2 {
 		if b.cube.IsSolved() {

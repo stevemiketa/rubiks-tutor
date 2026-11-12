@@ -1,9 +1,12 @@
 package server_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -143,6 +146,72 @@ func TestShareLinksStartWithThePublicBaseURL(t *testing.T) {
 
 			if want := "https://cubular.example/s/" + got.ID; got.URL != want {
 				t.Errorf("url %q, want %q", got.URL, want)
+			}
+		})
+	}
+}
+
+func TestWithoutAPublicBaseURLShareLinksTakeForwardedHeadersOnlyFromTrustedProxies(t *testing.T) {
+	forwarded := func(addr, proto, host string) func(*http.Request) {
+		return func(r *http.Request) {
+			r.RemoteAddr = addr
+			r.Header.Set("X-Forwarded-Proto", proto)
+			r.Header.Set("X-Forwarded-Host", host)
+		}
+	}
+	for _, tc := range []struct {
+		name    string
+		options []func(*http.Request)
+		want    string
+	}{
+		{"from a trusted proxy", []func(*http.Request){forwarded("10.1.2.3:4567", "https", "cubular.example")}, "https://cubular.example"},
+		{"with a port", []func(*http.Request){forwarded("10.1.2.3:4567", "https", "cubular.example:8443")}, "https://cubular.example:8443"},
+		{"the nearest proxy's value", []func(*http.Request){forwarded("10.1.2.3:4567", "http, https", "evil.example, cubular.example")}, "https://cubular.example"},
+		{"from an untrusted address", []func(*http.Request){forwarded("192.0.2.9:4567", "https", "evil.example")}, "http://example.com"},
+		{"a scheme that isn't http or https", []func(*http.Request){forwarded("10.1.2.3:4567", "javascript", "cubular.example")}, "http://cubular.example"},
+		{"a host with a path", []func(*http.Request){forwarded("10.1.2.3:4567", "https", "evil.example/s")}, "https://example.com"},
+		{"a host with user info", []func(*http.Request){forwarded("10.1.2.3:4567", "https", "me@evil.example")}, "https://example.com"},
+		{"no forwarding headers", []func(*http.Request){from("10.1.2.3:4567")}, "http://example.com"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testConfig(t)
+			cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+			got := mustShare(t, server.New(cfg), `{"scramble": "F", "moves": ""}`, tc.options...)
+
+			if want := tc.want + "/s/" + got.ID; got.URL != want {
+				t.Errorf("url %q, want %q", got.URL, want)
+			}
+		})
+	}
+}
+
+func TestThePublicBaseURLWinsOverForwardedHeaders(t *testing.T) {
+	cfg := testConfig(t)
+	cfg.PublicBaseURL = "https://cubular.example"
+	cfg.TrustedProxies = []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
+	got := mustShare(t, server.New(cfg), `{"scramble": "F", "moves": ""}`, func(r *http.Request) {
+		r.RemoteAddr = "10.1.2.3:4567"
+		r.Header.Set("X-Forwarded-Host", "other.example")
+	})
+
+	if want := "https://cubular.example/s/" + got.ID; got.URL != want {
+		t.Errorf("url %q, want %q", got.URL, want)
+	}
+}
+
+func TestStartingWithoutAPublicBaseURLLogsAWarning(t *testing.T) {
+	for _, base := range []string{"", "https://cubular.example"} {
+		t.Run("PublicBaseURL="+base, func(t *testing.T) {
+			var logs bytes.Buffer
+			cfg := testConfig(t)
+			cfg.PublicBaseURL = base
+			cfg.Logger = slog.New(slog.NewJSONHandler(&logs, nil))
+
+			server.New(cfg)
+
+			warned := strings.Contains(logs.String(), `"level":"WARN"`) && strings.Contains(logs.String(), "PUBLIC_BASE_URL")
+			if warned != (base == "") {
+				t.Errorf("logs %q; want a PUBLIC_BASE_URL warning: %v", logs.String(), base == "")
 			}
 		})
 	}

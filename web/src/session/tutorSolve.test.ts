@@ -1,8 +1,16 @@
 // Solve and Playback in the Tutor: asking the solver, loading its Solution,
 // and playing it one Move at a time as the scene finishes each.
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { formatMoves, parseMoves, stickerAt, type Move } from '../cube/index.ts'
-import { Session, Tutor, parseSolveResponse, type MoveQueue, type SolveResult, type TutorOptions } from './index.ts'
+import {
+  Session,
+  SolveRefused,
+  Tutor,
+  parseSolveResponse,
+  type MoveQueue,
+  type SolveResult,
+  type TutorOptions,
+} from './index.ts'
 
 // Recorded from the Go solver (POST /api/solve) for this Scramble and Move history.
 const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
@@ -67,7 +75,7 @@ const twoStageSolver = () =>
     }),
   )
 
-function tutorWith(session: Session, options: TutorOptions): Tutor {
+function tutorWith(session: Session, options: TutorOptions = {}): Tutor {
   return new Tutor(session, options)
 }
 
@@ -141,6 +149,52 @@ describe('Tutor.solve', () => {
     await retry
     expect(tutor.getState().solveStatus).toBe('idle')
     expect(tutor.getState().session.solution?.stages).toHaveLength(1)
+  })
+
+  // The server's answers, through the real POST /api/solve client.
+  describe.each([
+    ['413, a Session with more Moves than Solve takes', 413, 'too-many-moves'],
+    ['400, a request the solver refuses', 400, 'rejected'],
+    ['422, another refusal', 422, 'rejected'],
+    ['429, too many requests for now', 429, 'failed'],
+    ['408, a request that took too long', 408, 'failed'],
+    ['500, a server error', 500, 'failed'],
+    ['503, a server that is unavailable', 503, 'failed'],
+  ] as const)('when the server answers %s', (_, status, solveStatus) => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    it(`says so as '${solveStatus}'`, async () => {
+      vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ code: 'x', message: 'y' }, { status })))
+      const tutor = tutorWith(scrambled())
+
+      await tutor.solve()
+
+      expect(tutor.getState().solveStatus).toBe(solveStatus)
+      expect(tutor.getState().session.solution).toBeUndefined()
+    })
+  })
+
+  it('says the server couldn’t be reached as a failure that trying again may fix', async () => {
+    vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')))
+    const tutor = tutorWith(scrambled())
+
+    await tutor.solve()
+
+    expect(tutor.getState().solveStatus).toBe('failed')
+    vi.unstubAllGlobals()
+  })
+
+  it('clears a refusal at the next Move, as it does a failure', async () => {
+    const solver = handSolver()
+    const tutor = tutorWith(scrambled(), { solve: solver.solve })
+    const done = tutor.solve()
+    solver.calls[0]?.reject(new SolveRefused(413))
+    await done
+    expect(tutor.getState().solveStatus).toBe('too-many-moves')
+
+    tutor.rotate('left')
+
+    expect(tutor.getState().solveStatus).toBe('idle')
   })
 
   it('drops a Solution for a Cube that changed while Solve was waiting', async () => {

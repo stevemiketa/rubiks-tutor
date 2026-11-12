@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { prefersReducedMotion } from '../scene/usePrefersReducedMotion.ts'
 import { canRenderWebGL } from '../scene/webgl.tsx'
 import { SessionStore, Tutor, browserStorage, type TutorState } from '../session/index.ts'
 
@@ -74,8 +75,4 @@ function keepsKey(target: EventTarget | null, key: string): boolean {
   if (target instanceof HTMLInputElement && target.type === 'range') return SLIDER_KEYS.has(key)
   if (key === ' ' && target.closest('[role="alertdialog"], [role="dialog"]') !== null) return true
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
-}
-
-function prefersReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

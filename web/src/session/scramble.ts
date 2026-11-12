@@ -4,6 +4,12 @@ import type { Amount, Letter, Move } from '../cube/index.ts'
 /** How many Turns a Scramble has. */
 const SCRAMBLE_LENGTH = 25
 
+/** How long a new Session's Scramble takes to play, in ms. */
+const SCRAMBLE_MS = 2000
+
+/** How long each Turn of a Scramble takes to play, in ms: about two seconds for all of them. */
+export const SCRAMBLE_TURN_MS = SCRAMBLE_MS / SCRAMBLE_LENGTH
+
 // The outer Layers, by the axis they turn about. Opposite faces share an axis.
 const AXES: readonly (readonly Letter[])[] = [
   ['R', 'L'],

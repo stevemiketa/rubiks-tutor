@@ -29,16 +29,16 @@ type Stage struct {
 	Goal string // one sentence
 	// Moves are the Stage's Moves in order, starting from the Cube the
 	// earlier Stages leave.
-	Moves []Step
+	Moves []SolutionMove
 	// Algorithms lists each use of an Algorithm, in the order they occur.
 	Algorithms []AlgorithmUse
 	// Pieces names the Pieces the Stage works on, as cube.PieceNames does.
 	Pieces []string
 }
 
-// Step is one Move of a Stage, with a short note when it isn't part of an
-// Algorithm, such as "rotate so the unsolved corner is at front-right".
-type Step struct {
+// SolutionMove is one Move of a Stage, with a short note when it isn't part
+// of an Algorithm, such as "rotate so the unsolved corner is at front-right".
+type SolutionMove struct {
 	Move cube.Move
 	Note string // empty for no note
 }
@@ -84,7 +84,7 @@ func Solve(c cube.Cube) Solution {
 			ID:         spec.id,
 			Name:       spec.name,
 			Goal:       spec.goal,
-			Moves:      b.steps,
+			Moves:      b.moves,
 			Algorithms: b.algorithms,
 			Pieces:     append([]string{}, spec.pieces...),
 		})
@@ -96,13 +96,13 @@ func Solve(c cube.Cube) Solution {
 // builder collects one Stage's Moves while tracking the Cube they produce.
 type builder struct {
 	cube       cube.Cube
-	steps      []Step
+	moves      []SolutionMove
 	algorithms []AlgorithmUse
 }
 
 // move appends a Move that isn't part of an Algorithm, with its note.
 func (b *builder) move(m cube.Move, note string) {
-	b.steps = append(b.steps, Step{Move: m, Note: note})
+	b.moves = append(b.moves, SolutionMove{Move: m, Note: note})
 	b.cube = b.cube.Apply(m)
 }
 
@@ -119,9 +119,9 @@ func newAlgorithm(name, notation string) algorithm {
 // use appends one use of an Algorithm: its Moves, which get no notes, and a
 // record of where in the Stage's Moves they start.
 func (b *builder) use(a algorithm) {
-	b.algorithms = append(b.algorithms, AlgorithmUse{Name: a.name, Moves: slices.Clone(a.moves), Start: len(b.steps)})
+	b.algorithms = append(b.algorithms, AlgorithmUse{Name: a.name, Moves: slices.Clone(a.moves), Start: len(b.moves)})
 	for _, m := range a.moves {
-		b.steps = append(b.steps, Step{Move: m})
+		b.moves = append(b.moves, SolutionMove{Move: m})
 	}
 	b.cube = b.cube.Apply(a.moves...)
 }
@@ -150,7 +150,7 @@ func cheapest[T any](b *builder, items []T, do func(*builder, T)) int {
 	for i, item := range items {
 		trial := &builder{cube: b.cube}
 		do(trial, item)
-		if cost := len(trial.steps); best < 0 || cost < bestCost {
+		if cost := len(trial.moves); best < 0 || cost < bestCost {
 			best, bestCost = i, cost
 		}
 	}

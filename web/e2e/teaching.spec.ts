@@ -35,7 +35,7 @@ test('each Stage of a real Solution shows its goal and a card for each Algorithm
   )
   await expect(stage(page, 'White corners')).toContainText('Fill in the white corners to finish the first layer.')
   await expect(stage(page, 'Middle layer')).toContainText(
-    'Flip white to the bottom, then place the four middle-layer edges.',
+    'Rotate the Cube so white is on the bottom, then place the four middle-layer edges.',
   )
   await expect(stage(page, 'Yellow cross')).toContainText('Make a yellow cross on top.')
   await expect(stage(page, 'Yellow face')).toContainText('Twist the top corners until the whole top is yellow.')

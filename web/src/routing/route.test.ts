@@ -10,10 +10,8 @@ describe('parseRoute', () => {
     expect(parseRoute(pathname)).toEqual(route)
   })
 
-  it.each(['/nope', '/app/extra', '/s/', '/s/a/b'])(
-    'maps %s to not found, like the server does',
-    (pathname) => {
-      expect(parseRoute(pathname)).toEqual({ page: 'not-found' })
-    },
-  )
+  // The server answers these with a 404 of its own, so the app never sees them.
+  it.each(['/nope', '/app/extra', '/s/', '/s/a/b'])('maps %s to no page, as the server serves none there', (pathname) => {
+    expect(parseRoute(pathname)).toBeUndefined()
+  })
 })

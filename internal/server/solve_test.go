@@ -154,7 +154,7 @@ func TestSolveFillsInTheWhiteCornersAsStage2(t *testing.T) {
 	}
 }
 
-func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T) {
+func TestSolveRotatesWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T) {
 	const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
 	s := solve(t, newTestServer(t), scramble, "")
 	checkSolution(t, scramble, "", s)
@@ -163,7 +163,7 @@ func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T)
 		t.Fatalf("got Stages %v, want the middle layer third", stageIDs(s))
 	}
 	st := s.Stages[2]
-	if st.Name != "Middle layer" || st.Goal != "Flip white to the bottom, then place the four middle-layer edges." {
+	if st.Name != "Middle layer" || st.Goal != "Rotate the Cube so white is on the bottom, then place the four middle-layer edges." {
 		t.Errorf("Stage 3 is %q %q", st.Name, st.Goal)
 	}
 	if !sameSet(st.Pieces, middleEdges) {
@@ -173,7 +173,7 @@ func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T)
 	start := cube.Solved().Apply(cube.MustParseMoves(scramble + " " + s.Stages[0].Moves + " " + s.Stages[1].Moves)...)
 	moves, inAlgorithm := st.moves(t), st.inAlgorithm(t)
 	if len(moves) == 0 || !moves[0].IsRotation() || inAlgorithm[0] || start.Apply(moves[0])[cube.StickerAt(cube.D, 1, 1)] != cube.White {
-		t.Fatalf("Stage 3 %q doesn't start with a Cube rotation that flips white to the bottom", st.Moves)
+		t.Fatalf("Stage 3 %q doesn't start with a Cube rotation that turns white to the bottom", st.Moves)
 	}
 	if len(st.Notes) == 0 || st.Notes[0].At != 0 {
 		t.Errorf("Stage 3's opening Cube rotation has no note: %v", st.Notes)
@@ -188,7 +188,7 @@ func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T)
 			t.Errorf("Stage 3 uses %q %q, want only the right and left inserts", a.Name, a.Notation)
 		}
 	}
-	// After the flip, outside the inserts the Stage only rotates the Cube
+	// After that rotation, outside the inserts the Stage only rotates the Cube
 	// about y and turns the top Layer.
 	for i, m := range moves[1:] {
 		if !inAlgorithm[i+1] && m.Letter != 'y' && m.Letter != 'U' {

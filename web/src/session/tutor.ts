@@ -17,15 +17,12 @@ import {
   type RotationDirection,
 } from './controls.ts'
 import { MoveQueue, moveDuration } from './moveQueue.ts'
-import { generateScramble } from './scramble.ts'
+import { SCRAMBLE_TURN_MS, generateScramble } from './scramble.ts'
 import { Session, type PlaybackSpeed } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
 import { snapshotApi } from './snapshotClient.ts'
-import { requestSolve, type Solver } from './solveClient.ts'
-
-/** How long a new Session's Scramble takes to play, in ms. */
-const SCRAMBLE_MS = 2000
+import { SolveRefused, requestSolve, type Solver } from './solveClient.ts'
 
 /** A hint the tutor shows: 'select-sticker' asks the learner to select a Sticker first. */
 export type Hint = 'select-sticker'
@@ -39,10 +36,13 @@ export type Confirmation = 'new-scramble'
 /**
  * How the last Solve went: 'solving' while waiting for the solver,
  * 'already-solved' if there was nothing to solve, 'failed' if the solver
- * couldn't be reached, and 'idle' otherwise, including once a Solution is
- * loaded. 'already-solved' and 'failed' last until the learner's next Move.
+ * couldn't be reached or couldn't answer, which trying again may fix, and
+ * 'idle' otherwise, including once a Solution is loaded. When the solver
+ * refuses the Session, trying again won't help: 'too-many-moves' if it has
+ * more Moves than Solve takes, and 'rejected' for any other reason. Every
+ * status but 'idle' and 'solving' lasts until the learner's next Move.
  */
-export type SolveStatus = 'idle' | 'solving' | 'already-solved' | 'failed'
+export type SolveStatus = 'idle' | 'solving' | 'already-solved' | 'failed' | 'too-many-moves' | 'rejected'
 
 /** Everything the tutor's UI shows, as one immutable snapshot. */
 export interface TutorState {
@@ -60,9 +60,9 @@ export interface TutorState {
   readonly solveStatus: SolveStatus
   /**
    * The Snapshot the tutor shows unchanged, whose share link the address bar
-   * shows: the one being opened, or the one just opened or shared. The first
-   * change to what the Session would share (Session.toSnapshot), such as a
-   * Move or an undo, clears it.
+   * shows: the one being opened, or else the one the Session is still a copy
+   * of (Session.snapshotId), opened or shared. The first change to what the
+   * Session would share, such as a Move or an undo, clears it.
    */
   readonly snapshotId: string | undefined
   /** Where opening a share link has got to, until the Snapshot opens. Moves wait until then. */
@@ -110,7 +110,7 @@ export class Tutor {
       scrambling: false,
       confirming: undefined,
       solveStatus: 'idle',
-      snapshotId: undefined,
+      snapshotId: session.snapshotId,
       opening: undefined,
       sharing: undefined,
     }
@@ -127,16 +127,18 @@ export class Tutor {
   /**
    * The Tutor a page opens: the Session saved in the store, shown as it was
    * left, or else a new Session, whose Scramble plays from solved. Given a
-   * share link's snapshotId, it opens that Snapshot instead: see
-   * openSnapshot.
+   * share link's snapshotId, it opens that Snapshot instead (see
+   * openSnapshot), unless the saved Session is still a copy of it: then a
+   * reload of the link keeps what the Snapshot can't hold, such as a loaded
+   * Solution, where Playback is in it, and the redo stack.
    */
   static open(options: TutorOptions = {}, snapshotId?: string): Tutor {
-    if (snapshotId !== undefined) {
+    const saved = options.store?.load()
+    if (snapshotId !== undefined && saved?.snapshotId !== snapshotId) {
       const tutor = new Tutor(Session.start(), options)
       void tutor.openSnapshot(snapshotId)
       return tutor
     }
-    const saved = options.store?.load()
     if (saved !== undefined) return new Tutor(saved, options)
     const tutor = new Tutor(Session.start(), options)
     tutor.#startNew()
@@ -181,13 +183,13 @@ export class Tutor {
         this.#update({ opening: 'not-found' })
         return
       }
-      session = Session.fromSnapshot(snapshot)
+      session = Session.fromSnapshot(snapshot, id)
     } catch {
       if (stillOpening()) this.#update({ opening: 'failed' })
       return
     }
     this.queue.jump(session.cube)
-    this.#update({ session, snapshotId: id, opening: undefined, scrambling: false, hint: undefined })
+    this.#update({ session, opening: undefined, scrambling: false, hint: undefined })
   }
 
   /**
@@ -205,7 +207,7 @@ export class Tutor {
       const shared = await this.#client().share(session.toSnapshot())
       if (!stillSaving()) return
       const unchanged = this.#state.session === session
-      this.#update({ sharing: { status: 'shared', ...shared }, ...(unchanged && { snapshotId: shared.id }) })
+      this.#update({ sharing: { status: 'shared', ...shared }, ...(unchanged && { session: session.sharedAs(shared.id) }) })
     } catch (error) {
       if (stillSaving()) this.#update({ sharing: { status: 'failed', message: messageOf(error) } })
     }
@@ -320,8 +322,8 @@ export class Tutor {
     let result
     try {
       result = await (this.#options.solve ?? requestSolve)(scramble, history)
-    } catch {
-      this.#update({ solveStatus: 'failed' })
+    } catch (error) {
+      this.#update({ solveStatus: failedSolveStatus(error) })
       return
     }
     // Nothing else ends a Solve that is waiting, but the Cube may have changed.
@@ -337,11 +339,7 @@ export class Tutor {
    * each Move is queued once the scene has finished showing the one before.
    */
   play(): void {
-    const { session } = this.#state
-    const playing = session.play()
-    if (playing === session) return
-    this.#update({ session: playing })
-    if (this.queue.isIdle) this.#playNext()
+    this.#startPlayback(this.#state.session.play())
   }
 
   /**
@@ -350,11 +348,7 @@ export class Tutor {
    * plays them.
    */
   reverse(): void {
-    const { session } = this.#state
-    const reversing = session.reverse()
-    if (reversing === session) return
-    this.#update({ session: reversing })
-    if (this.queue.isIdle) this.#playNext()
+    this.#startPlayback(this.#state.session.reverse())
   }
 
   /** Pauses Playback if it is playing either way, and otherwise plays it forward: what Space does. */
@@ -481,6 +475,15 @@ export class Tutor {
     this.#playback(session.playNext(), move)
   }
 
+  // Takes a Session with Playback just started one way or the other, if it
+  // changed. Its first Move is queued now if the scene is idle, and
+  // otherwise once the scene has shown what it is animating.
+  #startPlayback(session: Session): void {
+    if (session === this.#state.session) return
+    this.#update({ session })
+    if (this.queue.isIdle) this.#playNext()
+  }
+
   // Takes a Session that shows the same Cube, such as one with Playback
   // paused or at another speed, if it changed.
   #settle(session: Session): void {
@@ -540,7 +543,7 @@ export class Tutor {
       return
     }
     this.queue.jump(Cube.solved())
-    for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_MS / session.scramble.length)
+    for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_TURN_MS)
     this.#update({ ...changes, scrambling: true })
   }
 
@@ -549,25 +552,25 @@ export class Tutor {
   }
 
   // Every change goes through here. A changed Session is saved before
-  // anything else hears of it. Once what it would share differs, it is no
-  // longer the Snapshot it was opened from or shared as, unless the change
-  // says it is.
+  // anything else hears of it, and the Snapshot the address bar shows
+  // becomes the one the Session is a copy of, if any, unless the change
+  // names one (a share link being opened).
   #update(changes: Partial<TutorState>): void {
     const before = this.#state
     this.#state = { ...before, ...changes }
-    if (this.#state.session !== before.session) {
-      if (this.#state.snapshotId !== undefined && !('snapshotId' in changes) && !sameSnapshot(before.session, this.#state.session)) {
-        this.#state = { ...this.#state, snapshotId: undefined }
-      }
-      this.#options.store?.save(this.#state.session)
+    const { session } = this.#state
+    if (session !== before.session) {
+      if (!('snapshotId' in changes)) this.#state = { ...this.#state, snapshotId: session.snapshotId }
+      this.#options.store?.save(session)
     }
     for (const listener of this.#listeners) listener()
   }
 }
 
-function sameSnapshot(a: Session, b: Session): boolean {
-  const [x, y] = [a.toSnapshot(), b.toSnapshot()]
-  return x.scramble === y.scramble && x.moves === y.moves
+/** How a Solve that rejected with error went: see SolveStatus. */
+function failedSolveStatus(error: unknown): SolveStatus {
+  if (!(error instanceof SolveRefused)) return 'failed'
+  return error.status === 413 ? 'too-many-moves' : 'rejected'
 }
 
 function messageOf(error: unknown): string {

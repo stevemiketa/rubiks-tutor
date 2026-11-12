@@ -11,9 +11,11 @@
 //	                      GET /readyz checks it
 //	PUBLIC_BASE_URL       where share links point, such as
 //	                      https://cubular.example (default: the address
-//	                      each request was sent to)
+//	                      each request was sent to, as a trusted proxy's
+//	                      X-Forwarded-Proto and X-Forwarded-Host say; a
+//	                      warning is logged at startup)
 //	TRUSTED_PROXIES       comma-separated CIDR ranges or addresses whose
-//	                      X-Forwarded-For headers are believed (default
+//	                      X-Forwarded-* headers are believed (default
 //	                      none)
 //	SHARE_LIMIT_PER_HOUR  how many Snapshots one client may share an hour
 //	                      (default 30)
@@ -149,7 +151,7 @@ func serverConfig(getenv func(string) string) (server.Config, error) {
 		cfg.TrustedProxies = append(cfg.TrustedProxies, prefix.Masked())
 	}
 
-	cfg.ShareLimit = server.DefaultShareLimit
+	// A limit left unset stays zero, which server.New reads as its default.
 	if v := getenv("SHARE_LIMIT_PER_HOUR"); v != "" {
 		perHour, err := strconv.ParseFloat(v, 64)
 		if err != nil || !(perHour > 0) {

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -17,8 +18,11 @@ import (
 // snapshotAPI serves POST /api/snapshots, which shares a Snapshot, and
 // GET /api/snapshots/{id}, which opens one.
 type snapshotAPI struct {
-	store     snapshot.Store
-	baseURL   string
+	store   snapshot.Store
+	baseURL string
+	// trusted are the proxies whose forwarding headers say where a request
+	// was sent, for share links when there is no baseURL.
+	trusted   []netip.Prefix
 	limiter   *rateLimiter
 	clientKey func(*http.Request) netip.Prefix
 	now       func() time.Time
@@ -75,17 +79,54 @@ func (api *snapshotAPI) create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sharedSnapshot{ID: id, URL: api.shareURL(r, id)})
 }
 
-// shareURL is the link that opens Snapshot id.
+// shareURL is the link that opens Snapshot id: under the public base URL,
+// or else at the address the request was sent to (see requestOrigin).
 func (api *snapshotAPI) shareURL(r *http.Request, id string) string {
 	base := strings.TrimSuffix(api.baseURL, "/")
 	if base == "" {
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		base = scheme + "://" + r.Host
+		base = requestOrigin(r, api.trusted)
 	}
 	return base + "/s/" + id
+}
+
+// requestOrigin is the scheme and host a request was sent to, such as
+// https://cubular.example. From a trusted proxy, that is what the proxy says
+// the client used, in X-Forwarded-Proto and X-Forwarded-Host, as the nearest
+// proxy set them; from anywhere else, or where those are missing or
+// malformed, it is the request's own. Only trusted proxies are believed, as
+// for a client's address (see clientAddr), so a client can't make a share
+// link point anywhere else.
+func requestOrigin(r *http.Request, trusted []netip.Prefix) string {
+	scheme, host := "http", r.Host
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if isTrusted(parseHop(r.RemoteAddr), trusted) {
+		if p := strings.ToLower(nearestForwarded(r.Header.Values("X-Forwarded-Proto"))); p == "http" || p == "https" {
+			scheme = p
+		}
+		if h := nearestForwarded(r.Header.Values("X-Forwarded-Host")); isHost(h) {
+			host = h
+		}
+	}
+	return scheme + "://" + host
+}
+
+// nearestForwarded is the last of a forwarding header's comma-separated
+// values: the one the nearest proxy set.
+func nearestForwarded(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	hops := strings.Split(values[len(values)-1], ",")
+	return strings.TrimSpace(hops[len(hops)-1])
+}
+
+// isHost reports whether s is a host, with an optional port, and nothing
+// else: no user info, path, query or fragment.
+func isHost(s string) bool {
+	u, err := url.Parse("http://" + s)
+	return s != "" && err == nil && u.Host == s && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == ""
 }
 
 func (api *snapshotAPI) get(w http.ResponseWriter, r *http.Request) {

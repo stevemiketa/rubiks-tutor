@@ -59,10 +59,10 @@ func solveResponseFor(s solver.Solution) solveResponse {
 	for i, st := range s.Stages {
 		moves := make([]cube.Move, len(st.Moves))
 		notes := []noteJSON{}
-		for j, step := range st.Moves {
-			moves[j] = step.Move
-			if step.Note != "" {
-				notes = append(notes, noteJSON{At: j, Text: step.Note})
+		for j, m := range st.Moves {
+			moves[j] = m.Move
+			if m.Note != "" {
+				notes = append(notes, noteJSON{At: j, Text: m.Note})
 			}
 		}
 		algorithms := make([]algorithmJSON, len(st.Algorithms))

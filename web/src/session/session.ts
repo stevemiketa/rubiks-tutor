@@ -19,6 +19,12 @@ interface Fields {
   readonly undone: readonly Move[]
   /** The Solution loaded, if any, and where Playback is in it. */
   readonly solution: LoadedSolution | undefined
+  /**
+   * The ID of the Snapshot the Session is still an unchanged copy of: the
+   * one it was opened from, or last shared as. #with forgets it at the first
+   * change to what the Session would share.
+   */
+  readonly snapshotId: string | undefined
 }
 
 /**
@@ -59,7 +65,7 @@ interface LoadedSolution {
  * Fields or changes how it is saved: data saved in any other version is
  * outdated, and restoring it starts a new Session instead.
  */
-const SAVED_VERSION = 3
+const SAVED_VERSION = 4
 
 /** A Session as plain data, ready for JSON: the format saved in browser storage. */
 export type SavedSession = { readonly version: number } & { readonly [K in keyof Fields]: unknown }
@@ -121,6 +127,16 @@ const loadedSolution: Codec<Fields['solution']> = {
   },
 }
 
+/** A Snapshot's ID is saved as text, or as null when the Session is a copy of none. */
+const snapshotId: Codec<Fields['snapshotId']> = {
+  write: (id) => id ?? null,
+  read: (data) => {
+    if (data === null) return undefined
+    if (typeof data !== 'string' || data === '') throw new TypeError('a Snapshot ID is saved as text')
+    return data
+  },
+}
+
 // One codec per field. The type requires every field to have one, so a new
 // field can't be left out of what is saved.
 const CODECS: { readonly [K in keyof Fields]: Codec<Fields[K]> } = {
@@ -128,6 +144,7 @@ const CODECS: { readonly [K in keyof Fields]: Codec<Fields[K]> } = {
   history: moves,
   undone: moves,
   solution: loadedSolution,
+  snapshotId,
 }
 const FIELD_NAMES = Object.keys(CODECS) as (keyof Fields)[]
 
@@ -149,7 +166,10 @@ export class Session {
 
   /** A new Session that starts by applying a Scramble to a solved Cube. */
   static start(scramble: readonly Move[] = []): Session {
-    return new Session({ scramble, history: [], undone: [], solution: undefined }, Cube.solved().apply(scramble))
+    return new Session(
+      { scramble, history: [], undone: [], solution: undefined, snapshotId: undefined },
+      Cube.solved().apply(scramble),
+    )
   }
 
   /**
@@ -174,23 +194,41 @@ export class Session {
 
   /**
    * A new Session that starts from a Snapshot: its Scramble, with its Moves
-   * as the Move history, so undo can take them back. Throws a ParseError if
-   * the notation is invalid.
+   * as the Move history, so undo can take them back. Given the Snapshot's
+   * ID, the Session remembers it is a copy of that Snapshot: see snapshotId.
+   * Throws a ParseError if the notation is invalid.
    */
-  static fromSnapshot(snapshot: Snapshot): Session {
+  static fromSnapshot(snapshot: Snapshot, id?: string): Session {
     const start = Session.start(parseMoves(snapshot.scramble))
     const history = parseMoves(snapshot.moves)
-    return start.#with({ history }, start.cube.apply(history))
+    return start.#with({ history, snapshotId: id }, start.cube.apply(history))
   }
 
   /**
    * The Snapshot that sharing this Session saves: the Scramble and the Move
    * history, with the Moves played from a loaded Solution after it, so it
    * shows the Cube as it is now. Undone Moves and the Solution itself are
-   * left out. This is the one place that decides what a Snapshot holds.
+   * left out.
    */
   toSnapshot(): Snapshot {
-    return { scramble: formatMoves(this.scramble), moves: formatMoves(this.closeSolution().history) }
+    return snapshotOf(this.#fields)
+  }
+
+  /** The Session, remembered as a copy of the Snapshot it was just shared as: see snapshotId. */
+  sharedAs(id: string): Session {
+    return this.#with({ snapshotId: id })
+  }
+
+  /**
+   * The ID of the Snapshot this Session is still an unchanged copy of: the
+   * one it was opened from, or the one it was last shared as. Anything that
+   * leaves the Snapshot as it was keeps it, such as Solve loading a Solution
+   * or Playback pausing; the first change to what the Session would share
+   * (toSnapshot), such as a Move, an undo, or a Move played from a
+   * Solution, forgets it for good. Undefined if it is a copy of none.
+   */
+  get snapshotId(): string | undefined {
+    return this.#fields.snapshotId
   }
 
   /** The Session as plain data, in the versioned format that restore reads. JSON.stringify calls it. */
@@ -508,9 +546,28 @@ export class Session {
     return loaded?.stale ? undefined : loaded
   }
 
+  // Every change makes a new Session here. A Session is a copy of a
+  // Snapshot only until what it would share changes, unless the change
+  // says which Snapshot it is a copy of.
   #with(changes: Partial<Fields>, cube: Cube = this.cube): Session {
-    return new Session({ ...this.#fields, ...changes }, cube)
+    const fields = { ...this.#fields, ...changes }
+    if (fields.snapshotId !== undefined && !('snapshotId' in changes) && !sameSnapshot(this.#fields, fields)) {
+      return new Session({ ...fields, snapshotId: undefined }, cube)
+    }
+    return new Session(fields, cube)
   }
+}
+
+/** The one place that decides what a Snapshot holds: see Session.toSnapshot. */
+function snapshotOf(fields: Fields): Snapshot {
+  const loaded = fields.solution
+  const played = loaded === undefined ? [] : loaded.solution.moves.slice(0, loaded.position)
+  return { scramble: formatMoves(fields.scramble), moves: formatMoves([...fields.history, ...played]) }
+}
+
+function sameSnapshot(a: Fields, b: Fields): boolean {
+  const [x, y] = [snapshotOf(a), snapshotOf(b)]
+  return x.scramble === y.scramble && x.moves === y.moves
 }
 
 function write<K extends keyof Fields>(name: K, fields: Fields): unknown {
