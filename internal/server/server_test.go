@@ -7,11 +7,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
 
 	"github.com/stevemiketa/rubiks-tutor/internal/server"
+	"github.com/stevemiketa/rubiks-tutor/internal/store"
 )
 
 // A small stand-in for the built frontend, so these tests don't depend on a
@@ -24,18 +26,33 @@ const (
 // newTestServer builds the real router with logs discarded.
 func newTestServer(t *testing.T) http.Handler {
 	t.Helper()
-	return newTestServerLoggingTo(t, slog.New(slog.DiscardHandler))
+	return server.New(testConfig(t))
 }
 
 func newTestServerLoggingTo(t *testing.T, logger *slog.Logger) http.Handler {
 	t.Helper()
-	return server.New(server.Config{
+	cfg := testConfig(t)
+	cfg.Logger = logger
+	return server.New(cfg)
+}
+
+// testConfig is the router's configuration in tests: the stand-in frontend,
+// a real SQLite Snapshot store in a temporary directory, and logs discarded.
+func testConfig(t *testing.T) server.Config {
+	t.Helper()
+	snapshots, err := store.Open(t.Context(), "sqlite:"+filepath.Join(t.TempDir(), "cubular.db"))
+	if err != nil {
+		t.Fatalf("opening the Snapshot store: %v", err)
+	}
+	t.Cleanup(func() { _ = snapshots.Close() })
+	return server.Config{
 		Frontend: fstest.MapFS{
 			"index.html":               {Data: []byte(entryPage)},
 			"assets/index-B1x2y3z4.js": {Data: []byte(hashedAsset)},
 		},
-		Logger: logger,
-	})
+		Logger:    slog.New(slog.DiscardHandler),
+		Snapshots: snapshots,
+	}
 }
 
 func get(t *testing.T, h http.Handler, path string) *http.Response {

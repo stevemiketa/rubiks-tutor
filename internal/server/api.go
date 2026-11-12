@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/stevemiketa/rubiks-tutor/internal/cube"
@@ -48,22 +49,30 @@ func (r movesRequest) Cube() cube.Cube {
 	return cube.Solved().Apply(r.Scramble...).Apply(r.Moves...)
 }
 
-// decodeMovesRequest reads and checks a movesRequest body: valid JSON, valid
-// notation, and no more than maxMoves Moves in a body of at most
-// maxBodyBytes.
+// decodeMovesRequest reads and checks a movesRequest body: one JSON object
+// with both fields, valid notation, and no more than maxMoves Moves in a
+// body of at most maxBodyBytes.
 func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *apiError) {
 	var body struct {
-		Scramble string `json:"scramble"`
-		Moves    string `json:"moves"`
+		Scramble *string `json:"scramble"`
+		Moves    *string `json:"moves"`
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(&body); err != nil {
-		if errors.As(err, new(*http.MaxBytesError)) {
-			return movesRequest{}, &apiError{
-				status:  http.StatusRequestEntityTooLarge,
-				Code:    "body-too-large",
-				Message: fmt.Sprintf("the request body is larger than %d bytes", maxBodyBytes),
-			}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	err := dec.Decode(&body)
+	if err == nil {
+		// Anything after the object, even another object, makes it invalid.
+		if extra := dec.Decode(&json.RawMessage{}); extra != io.EOF {
+			err = errors.Join(errors.New("more than one JSON value"), extra)
 		}
+	}
+	if errors.As(err, new(*http.MaxBytesError)) {
+		return movesRequest{}, &apiError{
+			status:  http.StatusRequestEntityTooLarge,
+			Code:    "body-too-large",
+			Message: fmt.Sprintf("the request body is larger than %d bytes", maxBodyBytes),
+		}
+	}
+	if err != nil || body.Scramble == nil || body.Moves == nil {
 		return movesRequest{}, &apiError{
 			status:  http.StatusBadRequest,
 			Code:    "invalid-request",
@@ -76,7 +85,7 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 		name     string
 		notation string
 		moves    *[]cube.Move
-	}{{"scramble", body.Scramble, &req.Scramble}, {"moves", body.Moves, &req.Moves}} {
+	}{{"scramble", *body.Scramble, &req.Scramble}, {"moves", *body.Moves, &req.Moves}} {
 		moves, err := cube.ParseMoves(f.notation)
 		if perr := (*cube.ParseError)(nil); errors.As(err, &perr) {
 			return movesRequest{}, &apiError{

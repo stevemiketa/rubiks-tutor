@@ -41,3 +41,7 @@ node_modules/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Local SQLite database (DATABASE_URL defaults to sqlite:cubular.db)
+/cubular.db
+/cubular.db-*

@@ -560,3 +560,36 @@ code.notation {
   border-radius: 0.25rem;
   background: #252a36;
 }
+
+/* Sharing: the share dialog (a .sheet) and a share link that can't open */
+
+.share-link {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.share-link input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #3a4150;
+  border-radius: 0.5rem;
+  background: #11131a;
+  color: inherit;
+  font-size: 0.95rem;
+}
+
+.snapshot-missing {
+  max-width: 32rem;
+  margin: 3rem auto;
+  text-align: center;
+}
+
+.panel.snapshot-missing h2 {
+  font-size: 1.25rem;
+}
+
+.snapshot-missing .confirm-actions {
+  justify-content: center;
+}
