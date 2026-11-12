@@ -57,9 +57,9 @@ export interface TutorState {
   readonly solveStatus: SolveStatus
   /**
    * The Snapshot the tutor shows unchanged, whose share link the address bar
-   * shows: the one being opened, or the one just opened or shared. The first
-   * change to what the Session would share (Session.toSnapshot), such as a
-   * Move or an undo, clears it.
+   * shows: the one being opened, or else the one the Session is still a copy
+   * of (Session.snapshotId), opened or shared. The first change to what the
+   * Session would share, such as a Move or an undo, clears it.
    */
   readonly snapshotId: string | undefined
   /** Where opening a share link has got to, until the Snapshot opens. Moves wait until then. */
@@ -107,7 +107,7 @@ export class Tutor {
       scrambling: false,
       confirming: undefined,
       solveStatus: 'idle',
-      snapshotId: undefined,
+      snapshotId: session.snapshotId,
       opening: undefined,
       sharing: undefined,
     }
@@ -124,16 +124,18 @@ export class Tutor {
   /**
    * The Tutor a page opens: the Session saved in the store, shown as it was
    * left, or else a new Session, whose Scramble plays from solved. Given a
-   * share link's snapshotId, it opens that Snapshot instead: see
-   * openSnapshot.
+   * share link's snapshotId, it opens that Snapshot instead (see
+   * openSnapshot), unless the saved Session is still a copy of it: then a
+   * reload of the link keeps what the Snapshot can't hold, such as a loaded
+   * Solution, where Playback is in it, and the redo stack.
    */
   static open(options: TutorOptions = {}, snapshotId?: string): Tutor {
-    if (snapshotId !== undefined) {
+    const saved = options.store?.load()
+    if (snapshotId !== undefined && saved?.snapshotId !== snapshotId) {
       const tutor = new Tutor(Session.start(), options)
       void tutor.openSnapshot(snapshotId)
       return tutor
     }
-    const saved = options.store?.load()
     if (saved !== undefined) return new Tutor(saved, options)
     const tutor = new Tutor(Session.start(), options)
     tutor.#startNew()
@@ -178,13 +180,13 @@ export class Tutor {
         this.#update({ opening: 'not-found' })
         return
       }
-      session = Session.fromSnapshot(snapshot)
+      session = Session.fromSnapshot(snapshot, id)
     } catch {
       if (stillOpening()) this.#update({ opening: 'failed' })
       return
     }
     this.queue.jump(session.cube)
-    this.#update({ session, snapshotId: id, opening: undefined, scrambling: false, hint: undefined })
+    this.#update({ session, opening: undefined, scrambling: false, hint: undefined })
   }
 
   /**
@@ -202,7 +204,7 @@ export class Tutor {
       const shared = await this.#client().share(session.toSnapshot())
       if (!stillSaving()) return
       const unchanged = this.#state.session === session
-      this.#update({ sharing: { status: 'shared', ...shared }, ...(unchanged && { snapshotId: shared.id }) })
+      this.#update({ sharing: { status: 'shared', ...shared }, ...(unchanged && { session: session.sharedAs(shared.id) }) })
     } catch (error) {
       if (stillSaving()) this.#update({ sharing: { status: 'failed', message: messageOf(error) } })
     }
@@ -547,25 +549,19 @@ export class Tutor {
   }
 
   // Every change goes through here. A changed Session is saved before
-  // anything else hears of it. Once what it would share differs, it is no
-  // longer the Snapshot it was opened from or shared as, unless the change
-  // says it is.
+  // anything else hears of it, and the Snapshot the address bar shows
+  // becomes the one the Session is a copy of, if any, unless the change
+  // names one (a share link being opened).
   #update(changes: Partial<TutorState>): void {
     const before = this.#state
     this.#state = { ...before, ...changes }
-    if (this.#state.session !== before.session) {
-      if (this.#state.snapshotId !== undefined && !('snapshotId' in changes) && !sameSnapshot(before.session, this.#state.session)) {
-        this.#state = { ...this.#state, snapshotId: undefined }
-      }
-      this.#options.store?.save(this.#state.session)
+    const { session } = this.#state
+    if (session !== before.session) {
+      if (!('snapshotId' in changes)) this.#state = { ...this.#state, snapshotId: session.snapshotId }
+      this.#options.store?.save(session)
     }
     for (const listener of this.#listeners) listener()
   }
-}
-
-function sameSnapshot(a: Session, b: Session): boolean {
-  const [x, y] = [a.toSnapshot(), b.toSnapshot()]
-  return x.scramble === y.scramble && x.moves === y.moves
 }
 
 function messageOf(error: unknown): string {

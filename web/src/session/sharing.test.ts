@@ -95,6 +95,51 @@ describe("a Session's Snapshot", () => {
   })
 })
 
+describe('the Snapshot a Session came from', () => {
+  // A one-Stage Solution for Scramble R then U, written by hand.
+  const solutionRU = () => {
+    const result = parseSolveResponse({
+      solved: false,
+      stages: [{ id: 'white-cross', name: 'White cross', goal: 'g', moves: "U' R'", notes: [], algorithms: [], pieces: [] }],
+    })
+    if (result.solved) throw new Error('unreachable')
+    return result.solution
+  }
+
+  it('is the one it was opened from, or shared as', () => {
+    expect(Session.start(parseMoves('R')).snapshotId).toBeUndefined()
+    expect(Session.fromSnapshot({ scramble: 'R', moves: 'U' }, 'abc').snapshotId).toBe('abc')
+    expect(play(Session.start(parseMoves('R')), 'U').sharedAs('id1').snapshotId).toBe('id1')
+  })
+
+  it('stays while what the Session would share stays the same: loading, pausing or closing a Solution with nothing played', () => {
+    const opened = Session.fromSnapshot({ scramble: 'R', moves: 'U' }, 'abc')
+
+    const loaded = opened.loadSolution(solutionRU())
+    expect(loaded.snapshotId).toBe('abc')
+    expect(loaded.play().pause().setSpeed(2).setAutoPause(false).snapshotId).toBe('abc')
+    expect(loaded.closeSolution().snapshotId).toBe('abc')
+  })
+
+  it('is forgotten at the first change to what the Session would share: a Move, an undo, or a Move played from a Solution', () => {
+    const opened = Session.fromSnapshot({ scramble: 'R', moves: 'U' }, 'abc')
+
+    expect(play(opened, 'F').snapshotId).toBeUndefined()
+    expect(opened.undo().snapshotId).toBeUndefined()
+    const stepped = opened.loadSolution(solutionRU()).stepForward()
+    expect(stepped.snapshotId).toBeUndefined()
+    // Coming back to the same Moves doesn't make it a copy of the Snapshot again.
+    expect(stepped.stepBack().snapshotId).toBeUndefined()
+  })
+
+  it('is saved with the Session', () => {
+    const store = new SessionStore(memoryStorage())
+    store.save(Session.fromSnapshot({ scramble: 'R', moves: 'U' }, 'abc').loadSolution(solutionRU()))
+
+    expect(store.load()?.snapshotId).toBe('abc')
+  })
+})
+
 describe('Tutor.share', () => {
   function sharingTutor() {
     const server = fakeServer()
@@ -277,6 +322,89 @@ describe('Tutor.open with a share link', () => {
     expect(tutor.queue.isIdle).toBe(true)
     expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
     expect(store.load()?.toSnapshot()).toEqual({ scramble: "R U' F2", moves: "M x2 E'" })
+  })
+
+  it('restores the saved Session on a reload of the link it was opened from: its Solution and Playback settings', async () => {
+    const { tutor, server, store } = openingTutor({ scramble: 'R', moves: 'U' }, { solve: solveRU })
+    await server.settle()
+    await tutor.solve()
+    tutor.setSpeed(2)
+
+    const reloaded = Tutor.open({ store, snapshots: server.client }, 'abc')
+
+    // Restored at once: the server isn't asked again.
+    const { session, opening, snapshotId } = reloaded.getState()
+    expect(opening).toBeUndefined()
+    expect(snapshotId).toBe('abc')
+    expect(formatMoves(session.solution?.moves ?? [])).toBe("U' R'")
+    expect(session.speed).toBe(2)
+    expect(reloaded.queue.shown.toString()).toBe(session.cube.toString())
+  })
+
+  it('restores the saved Session on a reload of the link it was just shared as: where Playback was in its Solution', async () => {
+    const server = fakeServer()
+    const store = new SessionStore(memoryStorage())
+    const tutor = new Tutor(Session.start(parseMoves('R U')), { store, snapshots: server.client, solve: solveRU })
+    await tutor.solve()
+    tutor.stepForward()
+    void tutor.share()
+    await server.settle()
+
+    const reloaded = Tutor.open({ store, snapshots: server.client }, 'id1')
+
+    const { session, opening, snapshotId } = reloaded.getState()
+    expect(opening).toBeUndefined()
+    expect(snapshotId).toBe('id1')
+    expect(session.position).toBe(1)
+    expect(formatMoves(session.solution?.moves ?? [])).toBe("U' R'")
+    expect(session.cube.toString()).toBe(Cube.solved().apply(parseMoves("R U U'")).toString())
+  })
+
+  it('restores the redo stack too, on a reload of the link it was shared as', async () => {
+    const server = fakeServer()
+    const store = new SessionStore(memoryStorage())
+    const tutor = new Tutor(Session.start(parseMoves('R U F')), { store, snapshots: server.client })
+    tutor.select(frontCenter)
+    tutor.turn('up')
+    tutor.turn('right')
+    tutor.undo()
+    void tutor.share()
+    await server.settle()
+
+    const reloaded = Tutor.open({ store, snapshots: server.client }, 'id1')
+
+    expect(formatMoves(reloaded.getState().session.history)).toBe("M'")
+    expect(formatMoves(reloaded.getState().session.undone)).toBe('E')
+  })
+
+  it("opens the link's Snapshot again once the saved Session has changed from it", async () => {
+    const { tutor, server, store } = openingTutor({ scramble: 'R', moves: 'U' })
+    await server.settle()
+    tutor.select(frontCenter)
+    tutor.turn('up')
+
+    const reloaded = Tutor.open({ store, snapshots: server.client }, 'abc')
+    expect(reloaded.getState().opening).toBe('loading')
+    await server.settle()
+
+    expect(formatMoves(reloaded.getState().session.history)).toBe('U')
+    expect(store.load()?.toSnapshot()).toEqual({ scramble: 'R', moves: 'U' })
+  })
+
+  it('opens any other link in place of the saved Session, even one that came from a Snapshot', async () => {
+    const { tutor, server, store } = openingTutor({ scramble: 'R', moves: 'U' }, { solve: solveRU })
+    await server.settle()
+    await tutor.solve()
+    server.stored.set('xyz', { scramble: 'F', moves: 'B' })
+
+    const other = Tutor.open({ store, snapshots: server.client }, 'xyz')
+    await server.settle()
+
+    const { session, snapshotId } = other.getState()
+    expect(snapshotId).toBe('xyz')
+    expect(session.toSnapshot()).toEqual({ scramble: 'F', moves: 'B' })
+    expect(session.solution).toBeUndefined()
+    expect(store.load()?.snapshotId).toBe('xyz')
   })
 
   it('makes no Moves until the Snapshot has opened', async () => {

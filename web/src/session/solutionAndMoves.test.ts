@@ -461,16 +461,17 @@ describe('saving a loaded Solution in browser storage', () => {
     new SessionStore(storage).save(Session.start(parseMoves('R U')).loadSolution(solution).stepForward().setSpeed(4))
 
     expect(JSON.parse([...storage.items.values()][0] ?? '')).toEqual({
-      version: 3,
+      version: 4,
       scramble: 'R U',
       history: '',
       undone: '',
       solution: { stages: [stage], position: 1, speed: 4, autoPause: true, stale: false },
+      snapshotId: null,
     })
   })
 
   const saved = (solution: unknown): string =>
-    JSON.stringify({ version: 3, scramble: 'R U', history: '', undone: '', solution })
+    JSON.stringify({ version: 4, scramble: 'R U', history: '', undone: '', solution, snapshotId: null })
   const stage = { id: 'white-cross', name: 'W', goal: 'g', moves: "U' R'", notes: [], algorithms: [], pieces: [] }
   const good = { stages: [stage], position: 1, speed: 1, autoPause: true, stale: false }
 
