@@ -1,9 +1,10 @@
+@import './theme/colors.css';
+
 :root {
-  color-scheme: dark;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.5;
-  color: #f1f3f5;
-  background: #11131a;
+  color: var(--color-text);
+  background: var(--color-bg);
 }
 
 body {
@@ -12,26 +13,26 @@ body {
 }
 
 a {
-  color: #8ab4ff;
+  color: var(--color-link);
 }
 
 .button {
   display: inline-block;
   padding: 0.75rem 1.5rem;
   border-radius: 0.5rem;
-  background: #3b82f6;
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   font-weight: 600;
   text-decoration: none;
 }
 
 .button:hover,
 .button:focus-visible {
-  background: #2563eb;
+  background: var(--color-accent-hover);
 }
 
 .muted {
-  color: #a3aab8;
+  color: var(--color-text-muted);
 }
 
 .notation {
@@ -53,9 +54,9 @@ a {
   max-width: 26rem;
   margin: 0;
   padding: 1rem 1.25rem;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border);
   border-radius: 0.75rem;
-  background: rgb(26 29 38 / 0.85);
+  background: var(--color-surface-overlay);
 }
 
 /* Splash page */
@@ -72,7 +73,14 @@ a {
   padding: 2.5rem 1rem 3rem;
   overflow: hidden;
   text-align: center;
-  background: linear-gradient(125deg, #0b1020, #24164a, #0d2c3a, #2b0f33, #0b1020);
+  background: linear-gradient(
+    125deg,
+    var(--color-splash-1),
+    var(--color-splash-2),
+    var(--color-splash-3),
+    var(--color-splash-4),
+    var(--color-splash-1)
+  );
   background-size: 400% 400%;
   animation: splash-gradient 24s ease-in-out infinite;
 }
@@ -121,20 +129,20 @@ a {
   font-size: clamp(2.75rem, 9vw, 5rem);
   line-height: 1.05;
   letter-spacing: -0.02em;
-  text-shadow: 0 2px 24px rgb(0 0 0 / 0.6);
+  text-shadow: 0 2px 24px var(--color-splash-title-shadow);
 }
 
 .splash-title p {
   margin: 0.5rem 0 0;
-  color: #c9cee0;
+  color: var(--color-splash-subtitle);
   font-size: 1.125rem;
-  text-shadow: 0 1px 12px rgb(0 0 0 / 0.7);
+  text-shadow: 0 1px 12px var(--color-splash-subtitle-shadow);
 }
 
 .splash-start .button {
   padding: 0.9rem 2.25rem;
   font-size: 1.125rem;
-  box-shadow: 0 8px 32px rgb(59 130 246 / 0.35);
+  box-shadow: 0 8px 32px var(--color-accent-glow);
 }
 
 /* Tutor */
@@ -158,7 +166,7 @@ a {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 500;
-  color: #a3aab8;
+  color: var(--color-text-muted);
 }
 
 .brand {
@@ -222,8 +230,8 @@ a {
   display: inline-block;
   padding: 0.35rem 1rem;
   border-radius: 999px;
-  background: #15803d;
-  color: #fff;
+  background: var(--color-success);
+  color: var(--color-on-success);
   font-weight: 700;
 }
 
@@ -231,15 +239,15 @@ a {
   display: inline-block;
   padding: 0.35rem 1rem;
   border-radius: 999px;
-  background: #1f2937;
-  color: #a3aab8;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
 }
 
 .hint:not(:empty) {
   padding: 0.5rem 1rem;
-  border: 1px solid #ff3fd2;
+  border: 1px solid var(--color-hint);
   border-radius: 0.5rem;
-  background: #1f2937;
+  background: var(--color-surface-raised);
 }
 
 .tutor-panel {
@@ -251,7 +259,7 @@ a {
 .panel {
   padding: 1rem;
   border-radius: 0.75rem;
-  background: #1a1d26;
+  background: var(--color-surface);
 }
 
 .panel h2 {
@@ -296,9 +304,9 @@ a {
   align-items: center;
   justify-content: center;
   min-height: 3.5rem;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border-control);
   border-radius: 0.5rem;
-  background: #252a36;
+  background: var(--color-control);
   color: inherit;
   font: inherit;
   line-height: 1.1;
@@ -308,11 +316,12 @@ a {
 
 .turn-button:hover,
 .turn-button:focus-visible {
-  background: #313848;
+  background: var(--color-control-hover);
 }
 
 .turn-button:active {
-  background: #3b82f6;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .turn-button:disabled {
@@ -334,9 +343,9 @@ a {
 
 .action-button {
   padding: 0.4rem 0.8rem;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border-control);
   border-radius: 0.5rem;
-  background: #252a36;
+  background: var(--color-control);
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -344,22 +353,22 @@ a {
 
 .action-button:hover:not(:disabled),
 .action-button:focus-visible {
-  background: #313848;
+  background: var(--color-control-hover);
 }
 
 .action-button:disabled {
-  color: #6b7280;
+  color: var(--color-text-disabled);
   cursor: default;
 }
 
 .action-button.danger {
-  border-color: #b91c1c;
-  background: #7f1d1d;
+  border-color: var(--color-danger-border);
+  background: var(--color-danger);
 }
 
 .action-button.danger:hover,
 .action-button.danger:focus-visible {
-  background: #991b1b;
+  background: var(--color-danger-hover);
 }
 
 .panel .scramble {
@@ -370,9 +379,9 @@ a {
 .confirm {
   margin-top: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid #f59e0b;
+  border: 1px solid var(--color-warning);
   border-radius: 0.5rem;
-  background: #1f2937;
+  background: var(--color-surface-raised);
 }
 
 .panel .confirm p {
@@ -426,9 +435,9 @@ a {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid #b91c1c;
+  border: 1px solid var(--color-danger-border);
   border-radius: 0.5rem;
-  background: #1f2937;
+  background: var(--color-surface-raised);
 }
 
 .panel .solve-error p {
@@ -449,9 +458,9 @@ a {
   gap: 0.5rem;
   margin-bottom: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid #d97706;
+  border: 1px solid var(--color-caution);
   border-radius: 0.5rem;
-  background: #1f2937;
+  background: var(--color-surface-raised);
 }
 
 .panel .stale-solution p {
@@ -492,7 +501,7 @@ a {
 
 .stage-name:enabled:hover,
 .stage-name:focus-visible {
-  color: #8ab4ff;
+  color: var(--color-link);
   text-decoration: underline;
 }
 
@@ -512,8 +521,8 @@ a {
 
 /* The Move the Cube made last. */
 .stage-moves li[aria-current='step'] {
-  background: #3b82f6;
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .panel .stage-list p {
@@ -524,11 +533,11 @@ a {
    in, the Algorithm being performed, and the Move reached with its note. */
 .stage-list > li[aria-current='true']::marker,
 .stage-list > li[aria-current='true'] > .stage-name {
-  color: #8ab4ff;
+  color: var(--color-link);
 }
 
 .panel .stage-list .stage-goal {
-  color: #a3aab8;
+  color: var(--color-text-muted);
   font-size: 0.875rem;
 }
 
@@ -545,9 +554,9 @@ a {
   display: flex;
   flex-direction: column;
   padding: 0.3rem 0.55rem;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  background: #20242f;
+  background: var(--color-surface-card);
   font-size: 0.875rem;
 }
 
@@ -556,22 +565,22 @@ a {
 }
 
 .algorithm-card[aria-current='true'] {
-  border-color: #f59e0b;
-  background: #2c2617;
+  border-color: var(--color-warning);
+  background: var(--color-surface-warning);
 }
 
 .algorithm-moves .performing {
   border-radius: 0.2rem;
-  background: #f59e0b;
-  color: #11131a;
+  background: var(--color-warning);
+  color: var(--color-on-warning);
 }
 
 .panel .reached-move {
   margin: 0 0 0.75rem;
   padding: 0.4rem 0.6rem;
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid var(--color-accent);
   border-radius: 0.25rem;
-  background: #20242f;
+  background: var(--color-surface-card);
 }
 
 /* Still there for screen readers, so the first note is announced. */
@@ -618,15 +627,15 @@ a {
 }
 
 .action-button[aria-pressed='true'] {
-  border-color: #3b82f6;
-  background: #3b82f6;
-  color: #fff;
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .scrubber {
   width: 100%;
   margin: 0;
-  accent-color: #3b82f6;
+  accent-color: var(--color-accent);
 }
 
 /* A switch: a track whose knob sits right when it is on. */
@@ -649,18 +658,18 @@ a {
   width: 2.25rem;
   height: 1.25rem;
   border-radius: 999px;
-  background-color: #3a4150;
-  background-image: radial-gradient(circle at 0.625rem 50%, #f1f3f5 0.4rem, transparent 0.45rem);
+  background-color: var(--color-border-control);
+  background-image: radial-gradient(circle at 0.625rem 50%, var(--color-text) 0.4rem, transparent 0.45rem);
 }
 
 .switch[aria-checked='true']::before {
-  background-color: #3b82f6;
-  background-image: radial-gradient(circle at 1.625rem 50%, #fff 0.4rem, transparent 0.45rem);
+  background-color: var(--color-accent);
+  background-image: radial-gradient(circle at 1.625rem 50%, var(--color-on-accent) 0.4rem, transparent 0.45rem);
 }
 
 .switch:focus-visible {
   border-radius: 0.25rem;
-  outline: 2px solid #8ab4ff;
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -710,14 +719,14 @@ a {
   width: min(36rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   padding: 0;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border);
   border-radius: 0.75rem;
-  background: #1a1d26;
+  background: var(--color-surface);
   color: inherit;
 }
 
 .sheet::backdrop {
-  background: rgb(0 0 0 / 0.6);
+  background: var(--color-backdrop);
 }
 
 .sheet-body {
@@ -771,7 +780,7 @@ kbd {
 code.notation {
   padding: 0 0.2rem;
   border-radius: 0.25rem;
-  background: #252a36;
+  background: var(--color-control);
 }
 
 /* Sharing: the share dialog (a .sheet) and a share link that can't open */
@@ -786,9 +795,9 @@ code.notation {
   flex: 1;
   min-width: 0;
   padding: 0.4rem 0.6rem;
-  border: 1px solid #3a4150;
+  border: 1px solid var(--color-border-control);
   border-radius: 0.5rem;
-  background: #11131a;
+  background: var(--color-field);
   color: inherit;
   font-size: 0.95rem;
 }

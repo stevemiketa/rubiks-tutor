@@ -15,5 +15,9 @@ export default defineConfig({
     // file-system module cache keys a module on its own content, not on the
     // files a glob matches, so it would miss a newly added case file.
     fsModuleCache: false,
+    // Vitest hands tests an empty string for CSS unless it's listed here.
+    // colors.test.ts reads the color tokens from the CSS that defines them,
+    // and checks the app's CSS uses nothing else.
+    css: { include: [/\/src\/index\.css/, /\/src\/theme\/colors\.css/] },
   },
 })
