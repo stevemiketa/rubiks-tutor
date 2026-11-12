@@ -16,6 +16,7 @@ export {
 export { snapRotations, type Orientation } from './drag.ts'
 export { MoveQueue, QUARTER_TURN_MS, moveDuration, type QueuedMove } from './moveQueue.ts'
 export { generateScramble } from './scramble.ts'
-export { Session, type SavedSession } from './session.ts'
+export { Session, type SavedSession, type Snapshot } from './session.ts'
 export { SessionStore, browserStorage, type StorageLike } from './sessionStore.ts'
+export type { Opening, SharedSnapshot, Sharing, SnapshotClient } from './sharing.ts'
 export { Tutor, type Confirmation, type Hint, type TutorOptions, type TutorState } from './tutor.ts'

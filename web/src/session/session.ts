@@ -26,6 +26,15 @@ const SAVED_VERSION = 2
 /** A Session as plain data, ready for JSON: the format saved in browser storage. */
 export type SavedSession = { readonly version: number } & { readonly [K in keyof Fields]: unknown }
 
+/**
+ * A Snapshot as the server's API takes and returns it: the frozen copy of a
+ * Session that a share link opens, with its Moves in standard notation.
+ */
+export interface Snapshot {
+  readonly scramble: string
+  readonly moves: string
+}
+
 /** How one field is saved as plain data, and read back. read throws on data it can't read. */
 interface Codec<T> {
   write(value: T): unknown
@@ -87,6 +96,26 @@ export class Session {
     const restored = fields as Fields
     // The Cube on screen, worked out from the fields as the class comment describes.
     return new Session(restored, Cube.solved().apply(restored.scramble).apply(restored.history))
+  }
+
+  /**
+   * A new Session that starts from a Snapshot: its Scramble, with its Moves
+   * as the Move history, so undo can take them back. Throws a ParseError if
+   * the notation is invalid.
+   */
+  static fromSnapshot(snapshot: Snapshot): Session {
+    const start = Session.start(parseMoves(snapshot.scramble))
+    const history = parseMoves(snapshot.moves)
+    return start.#with({ history }, start.cube.apply(history))
+  }
+
+  /**
+   * The Snapshot that sharing this Session saves: the Scramble and the Move
+   * history. Undone Moves are left out. This is the one place that decides
+   * what a Snapshot holds.
+   */
+  toSnapshot(): Snapshot {
+    return { scramble: formatMoves(this.scramble), moves: formatMoves(this.history) }
   }
 
   /** The Session as plain data, in the versioned format that restore reads. JSON.stringify calls it. */

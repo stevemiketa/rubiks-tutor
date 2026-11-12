@@ -1,8 +1,9 @@
 // The live tutor: the current Session plus what is on screen around it (the
 // selected Sticker, a hint, whether the Scramble is still playing, a question
-// for the learner) and the MoveQueue the 3D scene animates. It starts new
-// Sessions and saves the Session after every change. React reads it through
-// useSyncExternalStore; nothing here renders.
+// for the learner, sharing) and the MoveQueue the 3D scene animates. It starts
+// new Sessions, shares them, opens share links, and saves the Session after
+// every change. React reads it through useSyncExternalStore; nothing here
+// renders.
 import { Cube, formatMove, inverse, isRotation, type Move, type Sticker } from '../cube/index.ts'
 import {
   commandForKey,
@@ -19,6 +20,7 @@ import { MoveQueue } from './moveQueue.ts'
 import { generateScramble } from './scramble.ts'
 import { Session } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
+import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
 
 /** How long a new Session's Scramble takes to play, in ms. */
 const SCRAMBLE_MS = 2000
@@ -45,6 +47,16 @@ export interface TutorState {
   readonly scrambling: boolean
   /** What the tutor is waiting for the learner to confirm, if anything. */
   readonly confirming: Confirmation | undefined
+  /**
+   * The Snapshot the tutor shows unchanged, whose share link the address bar
+   * shows: the one being opened, or the one just opened or shared. The first
+   * change to the Session clears it.
+   */
+  readonly snapshotId: string | undefined
+  /** Where opening a share link has got to, until the Snapshot opens. Moves wait until then. */
+  readonly opening: Opening | undefined
+  /** Where sharing has got to, while the share dialog is open. */
+  readonly sharing: Sharing | undefined
 }
 
 /** Where a Tutor saves its Session and how it starts new ones. Every option has a default. */
@@ -63,6 +75,8 @@ export interface TutorOptions {
    * Move, undo and redo is shown at once instead of queued. True by default.
    */
   readonly animates?: () => boolean
+  /** The server's Snapshot API, for sharing and opening share links. Without it, neither works. */
+  readonly snapshots?: SnapshotClient
 }
 
 export class Tutor {
@@ -75,7 +89,16 @@ export class Tutor {
   /** A Tutor showing a Session as it is, with nothing to animate. */
   constructor(session: Session = Session.start(), options: TutorOptions = {}) {
     this.queue = new MoveQueue(session.cube)
-    this.#state = { session, selected: undefined, hint: undefined, scrambling: false, confirming: undefined }
+    this.#state = {
+      session,
+      selected: undefined,
+      hint: undefined,
+      scrambling: false,
+      confirming: undefined,
+      snapshotId: undefined,
+      opening: undefined,
+      sharing: undefined,
+    }
     this.#options = options
     this.queue.subscribe(() => {
       if (this.#state.scrambling && this.queue.isIdle) this.#update({ scrambling: false })
@@ -84,9 +107,16 @@ export class Tutor {
 
   /**
    * The Tutor a page opens: the Session saved in the store, shown as it was
-   * left, or else a new Session, whose Scramble plays from solved.
+   * left, or else a new Session, whose Scramble plays from solved. Given a
+   * share link's snapshotId, it opens that Snapshot instead: see
+   * openSnapshot.
    */
-  static open(options: TutorOptions = {}): Tutor {
+  static open(options: TutorOptions = {}, snapshotId?: string): Tutor {
+    if (snapshotId !== undefined) {
+      const tutor = new Tutor(Session.start(), options)
+      void tutor.openSnapshot(snapshotId)
+      return tutor
+    }
     const saved = options.store?.load()
     if (saved !== undefined) return new Tutor(saved, options)
     const tutor = new Tutor(Session.start(), options)
@@ -114,6 +144,58 @@ export class Tutor {
     const { session } = this.#state
     if (session.canUndo || session.canRedo) this.#update({ confirming: 'new-scramble' })
     else this.#startNew()
+  }
+
+  /**
+   * Opens the Snapshot a share link names. Once it arrives it replaces the
+   * Session, and the one saved in the store, and shows at once. Until then
+   * Moves are ignored. Resolves when it has opened or failed: see
+   * TutorState.opening.
+   */
+  async openSnapshot(id: string): Promise<void> {
+    this.#update({ snapshotId: id, opening: 'loading', sharing: undefined, confirming: undefined })
+    const stillOpening = () => this.#state.opening === 'loading' && this.#state.snapshotId === id
+    let session: Session
+    try {
+      const snapshot = await this.#client().load(id)
+      if (!stillOpening()) return
+      if (snapshot === undefined) {
+        this.#update({ opening: 'not-found' })
+        return
+      }
+      session = Session.fromSnapshot(snapshot)
+    } catch {
+      if (stillOpening()) this.#update({ opening: 'failed' })
+      return
+    }
+    this.queue.jump(session.cube)
+    this.#update({ session, snapshotId: id, opening: undefined, scrambling: false, hint: undefined })
+  }
+
+  /**
+   * Shares the Session: saves its Snapshot on the server, then shows the
+   * share link. The address bar shows it too, unless the Session changed
+   * meanwhile. Does nothing while the Scramble plays, while a share link
+   * opens, or while a share is already being saved.
+   */
+  async share(): Promise<void> {
+    const { session, scrambling, opening, sharing } = this.#state
+    if (scrambling || opening !== undefined || sharing?.status === 'saving') return
+    this.#update({ sharing: { status: 'saving' } })
+    const stillSaving = () => this.#state.sharing?.status === 'saving'
+    try {
+      const shared = await this.#client().share(session.toSnapshot())
+      if (!stillSaving()) return
+      const unchanged = this.#state.session === session
+      this.#update({ sharing: { status: 'shared', ...shared }, ...(unchanged && { snapshotId: shared.id }) })
+    } catch (error) {
+      if (stillSaving()) this.#update({ sharing: { status: 'failed', message: messageOf(error) } })
+    }
+  }
+
+  /** Closes the share dialog. A share still being saved is forgotten. */
+  closeShare(): void {
+    if (this.#state.sharing !== undefined) this.#update({ sharing: undefined })
   }
 
   /** Answers yes to newScramble's question: the new Session replaces this one. */
@@ -223,10 +305,10 @@ export class Tutor {
 
   // Every new Move goes through here, so the Session and what the scene will
   // show once its queue drains always agree. Undo and redo queue their own
-  // Moves the same way. Moves wait for the Scramble: until it finishes, they
-  // are ignored.
+  // Moves the same way. Moves wait for the Scramble, and for a share link's
+  // Snapshot: until then, they are ignored.
   #move(move: Move, durationMs?: number): void {
-    if (this.#state.scrambling) return
+    if (this.#state.scrambling || this.#state.opening !== undefined) return
     this.#show(move, durationMs)
     this.#update({ session: this.#state.session.move(move) })
   }
@@ -241,7 +323,7 @@ export class Tutor {
   // Starts a new Session with a fresh Scramble, played from a solved Cube.
   #startNew(): void {
     const session = Session.start(generateScramble(this.#options.random))
-    const changes = { session, hint: undefined, confirming: undefined }
+    const changes = { session, hint: undefined, confirming: undefined, opening: undefined }
     if (this.#options.reducedMotion?.()) {
       this.queue.jump(session.cube)
       this.#update({ ...changes, scrambling: false })
@@ -252,12 +334,26 @@ export class Tutor {
     this.#update({ ...changes, scrambling: true })
   }
 
+  #client(): SnapshotClient {
+    const client = this.#options.snapshots
+    if (client === undefined) throw new Error("Sharing isn't available here.")
+    return client
+  }
+
   // Every change goes through here. A changed Session is saved before
-  // anything else hears of it.
+  // anything else hears of it. It is no longer the Snapshot it was opened
+  // from or shared as, unless the change says it is.
   #update(changes: Partial<TutorState>): void {
     const before = this.#state
     this.#state = { ...before, ...changes }
-    if (this.#state.session !== before.session) this.#options.store?.save(this.#state.session)
+    if (this.#state.session !== before.session) {
+      if (!('snapshotId' in changes)) this.#state = { ...this.#state, snapshotId: undefined }
+      this.#options.store?.save(this.#state.session)
+    }
     for (const listener of this.#listeners) listener()
   }
+}
+
+function messageOf(error: unknown): string {
+  return error instanceof Error && error.message !== '' ? error.message : 'Sharing failed. Try again.'
 }

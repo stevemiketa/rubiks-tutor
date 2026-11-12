@@ -138,7 +138,8 @@ func invalidSnapshot(err error) *apiError {
 			Offset:  &notation.Err.Offset,
 		}
 	}
-	e := &apiError{status: http.StatusBadRequest, Code: "invalid-snapshot", Message: err.Error() + "."}
+	message := err.Error()
+	e := &apiError{status: http.StatusBadRequest, Code: "invalid-snapshot", Message: strings.ToUpper(message[:1]) + message[1:] + "."}
 	switch {
 	case errors.Is(err, snapshot.ErrInvalidScramble):
 		e.Code = "invalid-scramble"
