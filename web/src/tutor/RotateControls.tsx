@@ -12,7 +12,14 @@ const BUTTONS: readonly { direction: RotationDirection; name: string; glyph: str
 ]
 
 /** On-screen buttons for all six Cube rotations, each labeled with its Move. */
-export function RotateControls({ onRotate }: { onRotate: (direction: RotationDirection) => void }) {
+export function RotateControls({
+  disabled = false,
+  onRotate,
+}: {
+  /** Whether Cube rotations must wait, as they do while the Scramble plays. */
+  disabled?: boolean
+  onRotate: (direction: RotationDirection) => void
+}) {
   return (
     <section className="panel" aria-labelledby="rotate-heading">
       <h2 id="rotate-heading">Rotate the Cube</h2>
@@ -27,6 +34,7 @@ export function RotateControls({ onRotate }: { onRotate: (direction: RotationDir
               className={`turn-button rotate-${direction}`}
               aria-label={`${name}: ${move}`}
               aria-keyshortcuts={key}
+              disabled={disabled}
               onClick={() => onRotate(direction)}
             >
               <span aria-hidden="true">{glyph}</span>

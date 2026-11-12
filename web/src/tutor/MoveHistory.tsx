@@ -33,7 +33,7 @@ export function MoveHistory({
         <div className="history-actions">
           <button
             type="button"
-            className="small-button"
+            className="action-button"
             disabled={!canUndo}
             aria-keyshortcuts="Control+Z Meta+Z"
             title="Undo (Ctrl+Z or ⌘Z)"
@@ -43,7 +43,7 @@ export function MoveHistory({
           </button>
           <button
             type="button"
-            className="small-button"
+            className="action-button"
             disabled={!canRedo}
             aria-keyshortcuts="Shift+Control+Z Shift+Meta+Z"
             title="Redo (Shift+Ctrl+Z or Shift+⌘Z)"

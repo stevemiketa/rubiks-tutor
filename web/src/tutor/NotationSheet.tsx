@@ -10,7 +10,7 @@ export function NotationSheet() {
 
   return (
     <>
-      <button type="button" className="small-button" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}>
+      <button type="button" className="action-button" aria-haspopup="dialog" onClick={() => dialog.current?.showModal()}>
         Notation cheat sheet
       </button>
       <dialog
@@ -25,7 +25,7 @@ export function NotationSheet() {
         <div className="sheet-body">
           <div className="panel-heading">
             <h2 id="notation-heading">Notation</h2>
-            <button type="button" className="small-button" onClick={() => dialog.current?.close()}>
+            <button type="button" className="action-button" onClick={() => dialog.current?.close()}>
               Close
             </button>
           </div>

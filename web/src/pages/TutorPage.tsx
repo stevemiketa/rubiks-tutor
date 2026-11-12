@@ -4,6 +4,7 @@ import { isSelectable } from '../session/index.ts'
 import { MoveHistory } from '../tutor/MoveHistory.tsx'
 import { NotationSheet } from '../tutor/NotationSheet.tsx'
 import { RotateControls } from '../tutor/RotateControls.tsx'
+import { ScramblePanel } from '../tutor/ScramblePanel.tsx'
 import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useTutor } from '../tutor/useTutor.ts'
 
@@ -39,6 +40,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
           />
           <div className="tutor-status">
             <p role="status">{solved && <span className="solved">Solved</span>}</p>
+            <p role="status">{state.scrambling && <span className="scrambling">Scrambling…</span>}</p>
             <p role="status" className="hint">
               {state.hint === 'select-sticker' &&
                 'Select a Sticker first: click one on the front, top or right face, or press W, A, S or D.'}
@@ -47,12 +49,25 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
         </div>
 
         <div className="tutor-panel">
-          <TurnControls selected={state.selected} onTurn={(direction) => tutor.turn(direction)} />
-          <RotateControls onRotate={(direction) => tutor.rotate(direction)} />
+          <ScramblePanel
+            scramble={session.scramble}
+            confirming={state.confirming === 'new-scramble'}
+            // Undone Moves count too: redo could bring them back.
+            movesMade={session.history.length + session.undone.length}
+            onNewScramble={() => tutor.newScramble()}
+            onConfirm={() => tutor.confirmNewScramble()}
+            onCancel={() => tutor.cancelNewScramble()}
+          />
+          <TurnControls
+            selected={state.selected}
+            disabled={state.scrambling}
+            onTurn={(direction) => tutor.turn(direction)}
+          />
+          <RotateControls disabled={state.scrambling} onRotate={(direction) => tutor.rotate(direction)} />
           <MoveHistory
             moves={session.history}
-            canUndo={session.canUndo}
-            canRedo={session.canRedo}
+            canUndo={session.canUndo && !state.scrambling}
+            canRedo={session.canRedo && !state.scrambling}
             onUndo={() => tutor.undo()}
             onRedo={() => tutor.redo()}
           />

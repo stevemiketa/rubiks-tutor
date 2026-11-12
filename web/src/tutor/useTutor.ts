@@ -1,14 +1,20 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { Tutor, commandForKey, type TutorState } from '../session/index.ts'
+import { SessionStore, Tutor, browserStorage, commandForKey, type TutorState } from '../session/index.ts'
 
 /**
  * The page's Tutor and its current state. The Tutor lives as long as the
  * component, and the tutor's keys anywhere on the page go to it, except in
  * text fields and while a modal dialog (such as the notation cheat sheet) is
- * open, which keeps Esc and the arrows for itself.
+ * open, which keeps Esc and the arrows for itself. It restores the Session
+ * saved in browser storage, or starts a new one, and saves the Session after
+ * every change.
  */
 export function useTutor(): { tutor: Tutor; state: TutorState } {
-  const [tutor] = useState(() => new Tutor())
+  // StrictMode calls this twice in development and keeps the first Tutor. The
+  // second finds the Session the first saved, so the two agree.
+  const [tutor] = useState(() =>
+    Tutor.open({ store: new SessionStore(browserStorage()), reducedMotion: prefersReducedMotion }),
+  )
   const state = useSyncExternalStore(tutor.subscribe, tutor.getState)
 
   useEffect(() => {
@@ -31,4 +37,8 @@ export function useTutor(): { tutor: Tutor; state: TutorState } {
 function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }

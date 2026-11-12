@@ -1,7 +1,9 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { moveHistory } from './tutor.ts'
 
-const moveHistory = (page: Page) => page.getByRole('list', { name: 'Move history' }).getByRole('listitem')
-const solved = (page: Page) => page.getByText('Solved', { exact: true })
+// With reduced motion the Scramble appears already applied, so Moves work as
+// soon as the page opens. Moves themselves still animate.
+test.use({ reducedMotion: 'reduce' })
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/app')
@@ -13,7 +15,6 @@ test('Shift + the arrow keys rotate the whole Cube, recorded as Moves', async ({
   }
 
   await expect(moveHistory(page)).toHaveText(['y', "y'", 'x', "x'"])
-  await expect(solved(page)).toBeVisible()
 })
 
 test('the on-screen buttons make all six Cube rotations', async ({ page }) => {
@@ -67,7 +68,6 @@ test('undo and redo work on Moves, from the keys and the buttons', async ({ page
   const redo = page.getByRole('button', { name: 'Redo' })
   for (let i = 0; i < 3; i++) await undo.click()
   await expect(moveHistory(page)).toHaveCount(0)
-  await expect(solved(page)).toBeVisible()
   await expect(undo).toBeDisabled()
 
   await redo.click()
@@ -98,7 +98,6 @@ test('dragging the empty space around the Cube rotates it, snapping square-on', 
   await drag(0.55)
 
   await expect(moveHistory(page)).toHaveText(["y'"])
-  await expect(solved(page)).toBeVisible()
 })
 
 test('the notation cheat sheet is one click away', async ({ page }) => {
