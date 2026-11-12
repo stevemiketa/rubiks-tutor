@@ -6,58 +6,105 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/stevemiketa/rubiks-tutor/internal/cube"
 )
 
-// maxBodyBytes is the largest request body the API reads. A Snapshot of
-// MaxMoves Moves needs at most about 30 KB.
-const maxBodyBytes = 64 << 10
+const (
+	// maxMoves caps the Moves in one request: Scramble and Move history
+	// together.
+	maxMoves = 10_000
+	// maxBodyBytes caps a request body. maxMoves Moves in notation take at
+	// most 3 bytes each ("R2 "), so this leaves room for JSON and whitespace.
+	maxBodyBytes = 64 << 10
+)
 
-// apiError is the body of every API error: a machine-readable code and a
-// message a person can read, plus where invalid notation went wrong.
+// apiError is an API error response body: a machine-readable code and a
+// readable message, plus where the error is for bad notation.
 type apiError struct {
 	status  int
 	Code    string `json:"code"`
 	Message string `json:"message"`
-	// Field and Offset locate invalid notation: the request field, and the
-	// 0-based character offset of the first invalid Move in it.
+	// For "invalid-notation": the field holding the bad notation, the bad
+	// token, and the 0-based character offset where it starts.
 	Field  string `json:"field,omitempty"`
+	Token  string `json:"token,omitempty"`
 	Offset *int   `json:"offset,omitempty"`
 }
-
-func (e *apiError) Error() string { return e.Message }
 
 func writeError(w http.ResponseWriter, e *apiError) {
 	writeJSON(w, e.status, e)
 }
 
-// readJSON decodes a request body holding exactly one JSON value into v.
-// Bodies over maxBodyBytes fail with 413 and anything else unreadable with
-// 400.
-func readJSON(w http.ResponseWriter, r *http.Request, v any) *apiError {
-	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
-	err := dec.Decode(v)
-	if err == nil {
-		switch extra := dec.Decode(&json.RawMessage{}); extra {
-		case io.EOF:
-		case nil:
-			err = errors.New("the body holds more than one JSON value")
-		default:
-			err = extra
-		}
-	}
-	if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-		return &apiError{
-			status:  http.StatusRequestEntityTooLarge,
-			Code:    "body-too-large",
-			Message: fmt.Sprintf("The request body is over the %d KiB limit.", maxBodyBytes>>10),
-		}
-	}
-	if err != nil {
-		return invalidRequest(fmt.Sprintf("The request body isn't valid JSON of the right shape: %v.", err))
-	}
-	return nil
+// movesRequest is a request body that carries a Session's Moves: a Scramble
+// and a Move history, each in space-separated notation.
+type movesRequest struct {
+	Scramble []cube.Move
+	Moves    []cube.Move
 }
 
-func invalidRequest(message string) *apiError {
-	return &apiError{status: http.StatusBadRequest, Code: "invalid-request", Message: message}
+// Cube returns the Cube the request describes: a solved Cube, then the
+// Scramble, then the Move history.
+func (r movesRequest) Cube() cube.Cube {
+	return cube.Solved().Apply(r.Scramble...).Apply(r.Moves...)
+}
+
+// decodeMovesRequest reads and checks a movesRequest body: one JSON object
+// with both fields, valid notation, and no more than maxMoves Moves in a
+// body of at most maxBodyBytes.
+func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *apiError) {
+	var body struct {
+		Scramble *string `json:"scramble"`
+		Moves    *string `json:"moves"`
+	}
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
+	err := dec.Decode(&body)
+	if err == nil {
+		// Anything after the object, even another object, makes it invalid.
+		if extra := dec.Decode(&json.RawMessage{}); extra != io.EOF {
+			err = errors.Join(errors.New("more than one JSON value"), extra)
+		}
+	}
+	if errors.As(err, new(*http.MaxBytesError)) {
+		return movesRequest{}, &apiError{
+			status:  http.StatusRequestEntityTooLarge,
+			Code:    "body-too-large",
+			Message: fmt.Sprintf("the request body is larger than %d bytes", maxBodyBytes),
+		}
+	}
+	if err != nil || body.Scramble == nil || body.Moves == nil {
+		return movesRequest{}, &apiError{
+			status:  http.StatusBadRequest,
+			Code:    "invalid-request",
+			Message: `the request body must be a JSON object with "scramble" and "moves" strings`,
+		}
+	}
+
+	var req movesRequest
+	for _, f := range []struct {
+		name     string
+		notation string
+		moves    *[]cube.Move
+	}{{"scramble", *body.Scramble, &req.Scramble}, {"moves", *body.Moves, &req.Moves}} {
+		moves, err := cube.ParseMoves(f.notation)
+		if perr := (*cube.ParseError)(nil); errors.As(err, &perr) {
+			return movesRequest{}, &apiError{
+				status:  http.StatusBadRequest,
+				Code:    "invalid-notation",
+				Message: fmt.Sprintf("%s: %v", f.name, perr),
+				Field:   f.name,
+				Token:   perr.Token,
+				Offset:  &perr.Offset,
+			}
+		}
+		*f.moves = moves
+	}
+	if n := len(req.Scramble) + len(req.Moves); n > maxMoves {
+		return movesRequest{}, &apiError{
+			status:  http.StatusRequestEntityTooLarge,
+			Code:    "too-many-moves",
+			Message: fmt.Sprintf("the request has %d Moves; the limit is %d", n, maxMoves),
+		}
+	}
+	return req, nil
 }

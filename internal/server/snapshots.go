@@ -25,13 +25,6 @@ type snapshotAPI struct {
 	logger    *slog.Logger
 }
 
-// snapshotRequest is the body of POST /api/snapshots. Both fields are
-// required, as standard notation.
-type snapshotRequest struct {
-	Scramble *string `json:"scramble"`
-	Moves    *string `json:"moves"`
-}
-
 type sharedSnapshot struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
@@ -53,7 +46,7 @@ func (api *snapshotAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, &apiError{
 			status:  http.StatusTooManyRequests,
 			Code:    "rate-limited",
-			Message: fmt.Sprintf("Too many Snapshots shared from your address. Try again in %s.", roughly(wait)),
+			Message: fmt.Sprintf("too many Snapshots shared from this address; try again in %d seconds", seconds),
 		})
 		return
 	}
@@ -62,16 +55,12 @@ func (api *snapshotAPI) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req snapshotRequest
-	if e := readJSON(w, r, &req); e != nil {
-		writeError(w, e)
+	req, apiErr := decodeMovesRequest(w, r)
+	if apiErr != nil {
+		writeError(w, apiErr)
 		return
 	}
-	if req.Scramble == nil || req.Moves == nil {
-		writeError(w, invalidRequest(`The body needs "scramble" and "moves", each a string of Moves in standard notation.`))
-		return
-	}
-	snap, err := snapshot.Parse(*req.Scramble, *req.Moves)
+	snap, err := snapshot.New(req.Scramble, req.Moves)
 	if err != nil {
 		writeError(w, invalidSnapshot(err))
 		return
@@ -110,7 +99,7 @@ func (api *snapshotAPI) get(w http.ResponseWriter, r *http.Request) {
 		// A Snapshot with this ID may be shared later, so don't cache.
 		w.Header().Set("Cache-Control", "no-store")
 		if errors.Is(err, snapshot.ErrNotFound) {
-			writeError(w, &apiError{status: http.StatusNotFound, Code: "not-found", Message: "There's no Snapshot with this ID."})
+			writeError(w, &apiError{status: http.StatusNotFound, Code: "not-found", Message: "there's no Snapshot with this ID"})
 			return
 		}
 		api.logger.ErrorContext(r.Context(), "loading a Snapshot", "err", err)
@@ -127,19 +116,9 @@ func (api *snapshotAPI) get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// invalidSnapshot is the API error for a Snapshot that failed validation.
+// invalidSnapshot is the API error for Moves that can't be a Snapshot.
 func invalidSnapshot(err error) *apiError {
-	if notation, ok := errors.AsType[*snapshot.NotationError](err); ok {
-		return &apiError{
-			status:  http.StatusBadRequest,
-			Code:    "invalid-notation",
-			Message: fmt.Sprintf("%q in %s isn't a Move in standard notation.", notation.Err.Token, notation.Field),
-			Field:   notation.Field,
-			Offset:  &notation.Err.Offset,
-		}
-	}
-	message := err.Error()
-	e := &apiError{status: http.StatusBadRequest, Code: "invalid-snapshot", Message: strings.ToUpper(message[:1]) + message[1:] + "."}
+	e := &apiError{status: http.StatusBadRequest, Code: "invalid-snapshot", Message: err.Error()}
 	switch {
 	case errors.Is(err, snapshot.ErrInvalidScramble):
 		e.Code = "invalid-scramble"
@@ -150,18 +129,6 @@ func invalidSnapshot(err error) *apiError {
 }
 
 var (
-	unavailable   = &apiError{status: http.StatusServiceUnavailable, Code: "unavailable", Message: "Sharing isn't available right now."}
-	internalError = &apiError{status: http.StatusInternalServerError, Code: "internal", Message: "Something went wrong on the server."}
+	unavailable   = &apiError{status: http.StatusServiceUnavailable, Code: "unavailable", Message: "sharing isn't available right now"}
+	internalError = &apiError{status: http.StatusInternalServerError, Code: "internal", Message: "something went wrong on the server"}
 )
-
-// roughly says how long a wait is, for a person: "2 minutes", "45 seconds".
-func roughly(d time.Duration) string {
-	if d > 90*time.Second {
-		return fmt.Sprintf("%d minutes", (d+time.Minute-1)/time.Minute)
-	}
-	s := (d + time.Second - 1) / time.Second
-	if s == 1 {
-		return "1 second"
-	}
-	return fmt.Sprintf("%d seconds", s)
-}

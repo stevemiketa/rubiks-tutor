@@ -63,39 +63,19 @@ func New(scramble, moves []cube.Move) (Snapshot, error) {
 	return Snapshot{scramble: scramble, moves: moves}, nil
 }
 
-// NotationError reports which field of a Snapshot holds invalid notation.
-// It wraps both [ErrInvalidNotation] and the [*cube.ParseError].
-type NotationError struct {
-	Field string // "scramble" or "moves"
-	Err   *cube.ParseError
-}
-
-func (e *NotationError) Error() string {
-	return fmt.Sprintf("%s: %v", e.Field, e.Err)
-}
-
-func (e *NotationError) Unwrap() []error { return []error{ErrInvalidNotation, e.Err} }
-
 // Parse returns the Snapshot of a Scramble and a Move history written in
-// standard notation, validated as [New] does.
+// standard notation, validated as [New] does. Invalid notation gives an
+// error wrapping both [ErrInvalidNotation] and the [*cube.ParseError].
 func Parse(scramble, moves string) (Snapshot, error) {
-	s, err := parseMoves("scramble", scramble)
+	s, err := cube.ParseMoves(scramble)
 	if err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("%w: scramble: %w", ErrInvalidNotation, err)
 	}
-	m, err := parseMoves("moves", moves)
+	m, err := cube.ParseMoves(moves)
 	if err != nil {
-		return Snapshot{}, err
+		return Snapshot{}, fmt.Errorf("%w: moves: %w", ErrInvalidNotation, err)
 	}
 	return New(s, m)
-}
-
-func parseMoves(field, notation string) ([]cube.Move, error) {
-	moves, err := cube.ParseMoves(notation)
-	if perr, ok := errors.AsType[*cube.ParseError](err); ok {
-		return nil, &NotationError{Field: field, Err: perr}
-	}
-	return moves, err
 }
 
 func isOuterTurn(m cube.Move) bool {

@@ -68,8 +68,9 @@ func parseURL(databaseURL string) (*dialect, string, error) {
 		if path == "" {
 			return nil, "", errors.New("DATABASE_URL names no SQLite file: use sqlite:<path>")
 		}
-		if strings.ContainsAny(path, "?#") {
-			return nil, "", errors.New("DATABASE_URL: a SQLite path can't contain ? or #")
+		// The driver reads everything after a ? as its own parameters.
+		if strings.Contains(path, "?") {
+			return nil, "", errors.New("DATABASE_URL: a SQLite path can't contain ?")
 		}
 		return sqlite, sqliteDSN(path), nil
 	default:

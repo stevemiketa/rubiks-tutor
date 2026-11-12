@@ -2,7 +2,16 @@
 // from a link.
 import { describe, expect, it } from 'vitest'
 import { Cube, formatMoves, parseMoves, stickerAt } from '../cube/index.ts'
-import { Session, SessionStore, Tutor, type Snapshot, type SnapshotClient, type StorageLike } from './index.ts'
+import {
+  Session,
+  SessionStore,
+  Tutor,
+  parseSolveResponse,
+  type Snapshot,
+  type SnapshotClient,
+  type StorageLike,
+  type TutorOptions,
+} from './index.ts'
 
 function play(session: Session, notation: string): Session {
   return parseMoves(notation).reduce((s, move) => s.move(move), session)
@@ -198,14 +207,40 @@ describe('Tutor.share', () => {
 })
 
 describe('Tutor.open with a share link', () => {
-  function openingTutor(snapshot: Snapshot | undefined) {
+  function openingTutor(snapshot: Snapshot | undefined, options: TutorOptions = {}) {
     const server = fakeServer()
     if (snapshot) server.stored.set('abc', snapshot)
     const store = new SessionStore(memoryStorage())
     store.save(play(Session.start(parseMoves('D L B')), 'R R R'))
-    const tutor = Tutor.open({ store, snapshots: server.client }, 'abc')
+    const tutor = Tutor.open({ ...options, store, snapshots: server.client }, 'abc')
     return { tutor, server, store }
   }
+
+  // A one-Stage Solution for Scramble R then U, written by hand.
+  const solveRU = () =>
+    Promise.resolve(
+      parseSolveResponse({
+        solved: false,
+        stages: [
+          { id: 'white-cross', name: 'White cross', goal: 'Solve it.', moves: "U' R'", notes: [], algorithms: [], pieces: [] },
+        ],
+      }),
+    )
+
+  it("keeps the share link while Solve loads a Solution, which changes none of the Snapshot's Moves", async () => {
+    const { tutor, server } = openingTutor({ scramble: 'R', moves: 'U' }, { solve: solveRU })
+    void tutor.solve()
+    expect(tutor.getState().solveStatus).toBe('idle')
+    await server.settle()
+
+    await tutor.solve()
+
+    expect(tutor.getState().session.solution).toBeDefined()
+    expect(tutor.getState().snapshotId).toBe('abc')
+    tutor.select(frontCenter)
+    tutor.turn('up')
+    expect(tutor.getState().snapshotId).toBeUndefined()
+  })
 
   it('opens the Snapshot as it was shared, in place of the saved Session, without animating', async () => {
     const { tutor, server, store } = openingTutor({ scramble: "R U' F2", moves: "M x2 E'" })

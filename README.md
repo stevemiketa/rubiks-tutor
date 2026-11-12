@@ -66,16 +66,16 @@ Every Snapshot store runs the same contract suite, `internal/snapshot/storetest`
 | Path | Contents |
 |---|---|
 | `cmd/cubular/` | The server's entry point: configuration, listening, graceful shutdown |
-| `internal/server/` | The HTTP router and its tests, which drive it in-process: the API, share rate limiting, and working out client addresses behind trusted proxies |
+| `internal/server/` | The HTTP router and its tests, which drive it in-process, including the solver's property tests through `POST /api/solve`, share rate limiting, and working out client addresses behind trusted proxies |
 | `internal/snapshot/` | Snapshots: validation, the canonical body and its IDs, and the `Store` interface, with its contract suite in `storetest/` |
 | `internal/store/` | The SQL Snapshot store: SQLite, chosen by `DATABASE_URL`, with migrations in `migrations/<database>/` embedded in the binary |
 | `internal/cube/` | The Go cube model: Cube state, notation, Moves, relabeling and Pieces. Its package doc defines the Sticker layout both models share |
+| `internal/solver/` | The beginner's-Method solver ([ADR 0001](docs/adr/0001-own-method-based-solver-in-go.md)): a pipeline of Stages, each with its goal, Moves, notes, Algorithms and Pieces |
 | `testdata/cube/` | The shared cube test cases, which both cube models must pass |
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
 | `web/src/cube/` | The TypeScript cube model, the same as the Go one |
-| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, and `Tutor`, which the tutor page reads, and which shares Sessions and opens share links |
-| `web/src/api/` | Calls to the server's API |
+| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, sharing and opening Snapshots, and `Tutor`, which the tutor page reads |
 | `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |

@@ -1,5 +1,4 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { snapshotApi } from '../api/snapshots.ts'
 import { canRenderWebGL } from '../scene/webgl.tsx'
 import { SessionStore, Tutor, browserStorage, commandForKey, type TutorState } from '../session/index.ts'
 
@@ -24,7 +23,6 @@ export function useTutor(snapshotId?: string): { tutor: Tutor; state: TutorState
         // at once, and so is every Move after it.
         reducedMotion: () => prefersReducedMotion() || !canRenderWebGL(),
         animates: canRenderWebGL,
-        snapshots: snapshotApi,
       },
       snapshotId,
     ),

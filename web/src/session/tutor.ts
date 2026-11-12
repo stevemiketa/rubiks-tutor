@@ -1,9 +1,9 @@
 // The live tutor: the current Session plus what is on screen around it (the
 // selected Sticker, a hint, whether the Scramble is still playing, a question
-// for the learner, sharing) and the MoveQueue the 3D scene animates. It starts
-// new Sessions, shares them, opens share links, and saves the Session after
-// every change. React reads it through useSyncExternalStore; nothing here
-// renders.
+// for the learner, how Solve is going, sharing) and the MoveQueue the 3D scene
+// animates. It starts new Sessions, asks the solver for Solutions, plays them
+// back, shares Sessions, opens share links, and saves the Session after every
+// change. React reads it through useSyncExternalStore; nothing here renders.
 import { Cube, formatMove, inverse, isRotation, type Move, type Sticker } from '../cube/index.ts'
 import {
   commandForKey,
@@ -21,6 +21,8 @@ import { generateScramble } from './scramble.ts'
 import { Session } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
+import { snapshotApi } from './snapshotClient.ts'
+import { requestSolve, type Solver } from './solveClient.ts'
 
 /** How long a new Session's Scramble takes to play, in ms. */
 const SCRAMBLE_MS = 2000
@@ -33,6 +35,14 @@ export type Hint = 'select-sticker'
  * asks before a new Session replaces one with Moves in it.
  */
 export type Confirmation = 'new-scramble'
+
+/**
+ * How the last Solve went: 'solving' while waiting for the solver,
+ * 'already-solved' if there was nothing to solve, 'failed' if the solver
+ * couldn't be reached, and 'idle' otherwise, including once a Solution is
+ * loaded. 'already-solved' and 'failed' last until the learner's next Move.
+ */
+export type SolveStatus = 'idle' | 'solving' | 'already-solved' | 'failed'
 
 /** Everything the tutor's UI shows, as one immutable snapshot. */
 export interface TutorState {
@@ -47,10 +57,12 @@ export interface TutorState {
   readonly scrambling: boolean
   /** What the tutor is waiting for the learner to confirm, if anything. */
   readonly confirming: Confirmation | undefined
+  readonly solveStatus: SolveStatus
   /**
    * The Snapshot the tutor shows unchanged, whose share link the address bar
    * shows: the one being opened, or the one just opened or shared. The first
-   * change to the Session clears it.
+   * change to what the Session would share (Session.toSnapshot), such as a
+   * Move or an undo, clears it.
    */
   readonly snapshotId: string | undefined
   /** Where opening a share link has got to, until the Snapshot opens. Moves wait until then. */
@@ -75,7 +87,9 @@ export interface TutorOptions {
    * Move, undo and redo is shown at once instead of queued. True by default.
    */
   readonly animates?: () => boolean
-  /** The server's Snapshot API, for sharing and opening share links. Without it, neither works. */
+  /** Where Solve gets Solutions. The Go solver, through POST /api/solve, by default. */
+  readonly solve?: Solver
+  /** Where Share saves Snapshots and share links load them. The server's Snapshot API by default. */
   readonly snapshots?: SnapshotClient
 }
 
@@ -95,13 +109,18 @@ export class Tutor {
       hint: undefined,
       scrambling: false,
       confirming: undefined,
+      solveStatus: 'idle',
       snapshotId: undefined,
       opening: undefined,
       sharing: undefined,
     }
     this.#options = options
+    // Once the scene has shown everything queued, the Scramble is over, and
+    // Playback asks for its next Move.
     this.queue.subscribe(() => {
-      if (this.#state.scrambling && this.queue.isIdle) this.#update({ scrambling: false })
+      if (!this.queue.isIdle) return
+      if (this.#state.scrambling) this.#update({ scrambling: false })
+      this.#playNext()
     })
   }
 
@@ -250,22 +269,70 @@ export class Tutor {
     for (const rotation of rotations) this.#move(rotation, 0)
   }
 
-  /** Undoes the last Move, animating it backward. Does nothing if there is none, or while the Scramble plays. */
+  /**
+   * Undoes the last Move, animating it backward. Does nothing if there is
+   * none, or while the Scramble plays. A loaded Solution is closed first, so
+   * this takes back the last Move played from it.
+   */
   undo(): void {
     const { session, scrambling } = this.#state
-    const last = session.history.at(-1)
+    const last = session.closeSolution().history.at(-1)
     if (last === undefined || scrambling) return
-    this.#show(inverse(last))
-    this.#update({ session: session.undo() })
+    this.#change(session.undo(), inverse(last), { solveStatus: this.#settledSolveStatus() })
   }
 
   /** Makes the last undone Move again. Does nothing if there is none, or while the Scramble plays. */
   redo(): void {
     const { session, scrambling } = this.#state
     const next = session.undone.at(-1)
-    if (next === undefined || scrambling) return
-    this.#show(next)
-    this.#update({ session: session.redo() })
+    if (!session.canRedo || next === undefined || scrambling) return
+    this.#change(session.redo(), next, { solveStatus: this.#settledSolveStatus() })
+  }
+
+  /**
+   * Asks the solver for a Solution for the Cube as it is, and loads it,
+   * paused at its start. Does nothing while the Scramble plays or while an
+   * earlier Solve is still waiting. If the Cube changes before the answer
+   * arrives, the answer is dropped.
+   */
+  async solve(): Promise<void> {
+    const { session, scrambling, solveStatus, opening } = this.#state
+    if (scrambling || solveStatus === 'solving' || opening !== undefined) return
+    const asked = session.cube.toString()
+    // The Moves played from a loaded Solution are part of how the Cube got here.
+    const { scramble, history } = session.closeSolution()
+    this.#update({ solveStatus: 'solving', session: session.pause() })
+
+    let result
+    try {
+      result = await (this.#options.solve ?? requestSolve)(scramble, history)
+    } catch {
+      this.#update({ solveStatus: 'failed' })
+      return
+    }
+    // Nothing else ends a Solve that is waiting, but the Cube may have changed.
+    const now = this.#state.session
+    if (now.cube.toString() !== asked) this.#update({ solveStatus: 'idle' })
+    else if (result.solved) this.#update({ solveStatus: 'already-solved' })
+    else this.#update({ solveStatus: 'idle', session: now.loadSolution(result.solution) })
+  }
+
+  /**
+   * Plays the loaded Solution from the current position, one Move at a time:
+   * each Move is queued once the scene has finished showing the one before.
+   */
+  play(): void {
+    const { session } = this.#state
+    const playing = session.play()
+    if (playing === session) return
+    this.#update({ session: playing })
+    if (this.queue.isIdle) this.#playNext()
+  }
+
+  /** Pauses Playback. The Move animating now finishes, and no other is queued. */
+  pause(): void {
+    const { session } = this.#state
+    if (session.playing) this.#update({ session: session.pause() })
   }
 
   /** Does what a Command asks. */
@@ -303,14 +370,34 @@ export class Tutor {
     return true
   }
 
-  // Every new Move goes through here, so the Session and what the scene will
-  // show once its queue drains always agree. Undo and redo queue their own
-  // Moves the same way. Moves wait for the Scramble, and for a share link's
-  // Snapshot: until then, they are ignored.
+  // Every new Move the learner makes goes through here. Moves wait for the
+  // Scramble, and for a share link's Snapshot: until then, they are ignored.
   #move(move: Move, durationMs?: number): void {
     if (this.#state.scrambling || this.#state.opening !== undefined) return
+    this.#change(this.#state.session.move(move), move, { solveStatus: this.#settledSolveStatus() }, durationMs)
+  }
+
+  // Plays the loaded Solution's next Move, if Playback is playing.
+  #playNext(): void {
+    const { session } = this.#state
+    const move = session.nextMove
+    if (!session.playing || move === undefined) return
+    this.#change(session.stepForward(), move)
+  }
+
+  // Every Move the Session makes goes through here, so the Session and what
+  // the scene will show once its queue drains always agree. The Session
+  // changes first: showing a Move at once notifies the queue's listeners, and
+  // they must see the Session it belongs to.
+  #change(session: Session, move: Move, changes: Partial<TutorState> = {}, durationMs?: number): void {
+    this.#update({ ...changes, session })
     this.#show(move, durationMs)
-    this.#update({ session: this.#state.session.move(move) })
+  }
+
+  // A learner's Move ends an 'already-solved' or 'failed' message. A Solve
+  // still waiting goes on waiting, and drops its answer if the Cube changed.
+  #settledSolveStatus(): SolveStatus {
+    return this.#state.solveStatus === 'solving' ? 'solving' : 'idle'
   }
 
   // Queues a Move for the scene to animate, or shows it at once when there is
@@ -323,7 +410,13 @@ export class Tutor {
   // Starts a new Session with a fresh Scramble, played from a solved Cube.
   #startNew(): void {
     const session = Session.start(generateScramble(this.#options.random))
-    const changes = { session, hint: undefined, confirming: undefined, opening: undefined }
+    const changes = {
+      session,
+      hint: undefined,
+      confirming: undefined,
+      solveStatus: this.#settledSolveStatus(),
+      opening: undefined,
+    }
     if (this.#options.reducedMotion?.()) {
       this.queue.jump(session.cube)
       this.#update({ ...changes, scrambling: false })
@@ -335,23 +428,29 @@ export class Tutor {
   }
 
   #client(): SnapshotClient {
-    const client = this.#options.snapshots
-    if (client === undefined) throw new Error("Sharing isn't available here.")
-    return client
+    return this.#options.snapshots ?? snapshotApi
   }
 
   // Every change goes through here. A changed Session is saved before
-  // anything else hears of it. It is no longer the Snapshot it was opened
-  // from or shared as, unless the change says it is.
+  // anything else hears of it. Once what it would share differs, it is no
+  // longer the Snapshot it was opened from or shared as, unless the change
+  // says it is.
   #update(changes: Partial<TutorState>): void {
     const before = this.#state
     this.#state = { ...before, ...changes }
     if (this.#state.session !== before.session) {
-      if (!('snapshotId' in changes)) this.#state = { ...this.#state, snapshotId: undefined }
+      if (this.#state.snapshotId !== undefined && !('snapshotId' in changes) && !sameSnapshot(before.session, this.#state.session)) {
+        this.#state = { ...this.#state, snapshotId: undefined }
+      }
       this.#options.store?.save(this.#state.session)
     }
     for (const listener of this.#listeners) listener()
   }
+}
+
+function sameSnapshot(a: Session, b: Session): boolean {
+  const [x, y] = [a.toSnapshot(), b.toSnapshot()]
+  return x.scramble === y.scramble && x.moves === y.moves
 }
 
 function messageOf(error: unknown): string {
