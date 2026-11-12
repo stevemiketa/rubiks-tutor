@@ -26,9 +26,12 @@ function describeSticker(sticker: Sticker): string {
 /** The on-screen arrows for the selected Sticker, each labeled with its Move. */
 export function TurnControls({
   selected,
+  disabled = false,
   onTurn,
 }: {
   selected: Sticker | undefined
+  /** Whether Turns must wait, as they do while the Scramble plays. */
+  disabled?: boolean
   onTurn: (direction: Direction) => void
 }) {
   return (
@@ -51,6 +54,7 @@ export function TurnControls({
                   type="button"
                   className={`turn-button turn-${direction}`}
                   aria-label={`Turn ${direction}: ${move}`}
+                  disabled={disabled}
                   onClick={() => onTurn(direction)}
                 >
                   <span aria-hidden="true">{ARROWS[direction]}</span>

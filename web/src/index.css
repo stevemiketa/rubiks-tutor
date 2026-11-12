@@ -228,6 +228,14 @@ a {
   font-weight: 700;
 }
 
+.scrambling {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  background: #1f2937;
+  color: #a3aab8;
+}
+
 .hint:not(:empty) {
   padding: 0.5rem 1rem;
   border: 1px solid #ff3fd2;
@@ -306,6 +314,75 @@ a {
 
 .turn-button:active {
   background: #3b82f6;
+}
+
+.turn-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.panel .panel-heading h2 {
+  margin: 0;
+}
+
+.action-button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #3a4150;
+  border-radius: 0.5rem;
+  background: #252a36;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.action-button:hover,
+.action-button:focus-visible {
+  background: #313848;
+}
+
+.action-button.danger {
+  border-color: #b91c1c;
+  background: #7f1d1d;
+}
+
+.action-button.danger:hover,
+.action-button.danger:focus-visible {
+  background: #991b1b;
+}
+
+.panel .scramble {
+  margin: 0;
+  word-spacing: 0.2em;
+}
+
+.confirm {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #f59e0b;
+  border-radius: 0.5rem;
+  background: #1f2937;
+}
+
+.panel .confirm p {
+  margin: 0 0 0.5rem;
+}
+
+.panel .confirm .confirm-question {
+  font-weight: 600;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .move-history {
