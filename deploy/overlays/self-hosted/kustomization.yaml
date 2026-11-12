@@ -11,7 +11,8 @@ resources:
 images:
   - name: ghcr.io/stevemiketa/rubiks-tutor
     # Fill in: the commit SHA of the master build to run. CI publishes one
-    # image per push to master, tagged with its full commit SHA.
+    # image per push to master that passes the gate, tagged with its full
+    # commit SHA.
     newTag: COMMIT_SHA
 
 configMapGenerator:

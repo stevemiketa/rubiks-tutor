@@ -25,13 +25,18 @@ Each gate step has its own command, and CI runs the same ones on every pull requ
 | Step | Command | What it runs |
 |---|---|---|
 | Go tests | `make test-go` | `gofmt` check, `go vet ./...`, `go test ./...` |
+| Vulnerabilities | `make govulncheck` | `govulncheck ./...`, which fails on any known vulnerability the Go code can reach |
 | Type-check | `make typecheck` | `tsc -b` in `web/` |
 | Vitest | `make test-web` | `vitest run` in `web/` |
 | Manifests | `make check-manifests` | builds the kustomize overlay in `deploy/` and validates it against the Kubernetes schemas |
 | Playwright | `make e2e` | builds the binary, then runs the browser journeys in `web/e2e/` against it |
 | **Whole gate** | `make gate` | all of the above, in that order |
 
-`make help` lists every target. A separate `Image` workflow builds the container image on every pull request and publishes it from `master` (see [Deploying](#deploying)).
+`make help` lists every target.
+
+CI (`.github/workflows/ci.yml`) runs each step as its own job on every pull request and every push to `master`. In parallel with them, it builds the container image and smoke-tests it on linux/amd64 and on linux/arm64. On `master` it publishes the image only once every one of those jobs has passed (see [Deploying](#deploying)). `govulncheck` also runs against `master` every Monday (`.github/workflows/govulncheck.yml`), so a newly published vulnerability fails a run without waiting for a push.
+
+Dependabot opens one grouped pull request a week for each of the actions, the Go modules, the npm packages and the distroless base image. It leaves the Go and Node versions alone. Bump Go in `go.mod` and in the Dockerfile's `golang` image together, and Node in `.nvmrc` and in the Dockerfile's `node` image together, so CI always tests with the versions the image is built with.
 
 The Playwright suite starts the binary itself with `PORT=0`, so the OS picks a free port, and reads the address from the server's `listening` log line. Several suites can run at the same time, in different worktrees, without colliding. These environment variables change what it tests:
 
@@ -110,7 +115,7 @@ They need a user who may create schemas: each test works in a new schema, which 
 
 ## Deploying
 
-Cubular ships as one container image, published to GHCR from every push to `master` and tagged with the commit SHA, and deploys to Kubernetes with the kustomize manifests in `deploy/`. [`deploy/README.md`](deploy/README.md) explains the image, the Secret and overlay values to provide, and how to apply them.
+Cubular ships as one container image, published to GHCR from every push to `master` that passes the gate and tagged with the commit SHA, and deploys to Kubernetes with the kustomize manifests in `deploy/`. [`deploy/README.md`](deploy/README.md) explains the image, the Secret and overlay values to provide, and how to apply them.
 
 ## Layout
 

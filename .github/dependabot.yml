@@ -1,0 +1,41 @@
+# Weekly updates, one grouped pull request per ecosystem. Each runs the
+# gate like any other pull request.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      go-modules:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      npm:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    # The golang and node images are bumped by hand, together with go.mod
+    # and .nvmrc, so CI and the image never build with different versions.
+    # This leaves the distroless base, which is pinned by digest.
+    ignore:
+      - dependency-name: golang
+      - dependency-name: node
+    groups:
+      docker:
+        patterns: ['*']
