@@ -1,7 +1,8 @@
-// The splash page's prerecorded loop: a Scramble, then a Solution by the
-// beginner's layer-by-layer Method that ends on the exact Cube the loop
-// started from, so it repeats without a jump. Recorded once, so the splash
-// page needs no server; recording.test.ts checks it with the cube model.
+// The splash page's prerecorded loop: the Cube a Scramble leaves, and a
+// Solution for it by the beginner's layer-by-layer Method. The splash page
+// starts on that scrambled Cube and plays only the Solution, so it never
+// animates the Scramble. Recorded once, so the splash page needs no server;
+// recording.test.ts checks it with the cube model.
 import { Cube, parseMoves, type Move } from '../cube/index.ts'
 
 /** 25 outer-layer Turns, following the tutor's Scramble rules. */
@@ -11,8 +12,8 @@ export const SPLASH_SCRAMBLE: readonly Move[] = parseMoves(
 
 // The Solution's Moves, one entry per Stage, using the Method's Algorithms.
 // White starts on top; the middle layer starts by rotating the Cube so white
-// is on the bottom, and a last x2 rotates the solved Cube back to the
-// orientation the loop started in.
+// is on the bottom, so the Cube ends solved with yellow on top, as the
+// tutor's Solutions do.
 const SOLUTION_BY_STAGE: readonly (readonly [stage: string, notation: string])[] = [
   ['white-cross', "F2 R' U2 F' U2 D' L2"],
   ['white-corners', "L' D' L D2 F' D' F D B' D' B D L' D' L B' D' B D"],
@@ -21,7 +22,6 @@ const SOLUTION_BY_STAGE: readonly (readonly [stage: string, notation: string])[]
   ['yellow-face', "R U R' U R U2 R'"],
   ['yellow-corners', 'U'],
   ['yellow-edges', "U R U' R U R U R U' R' U' R2 U' R U' R U R U R U' R' U' R2"],
-  ['rotate-back', 'x2'],
 ]
 
 const movesThrough = (stage: string): Move[] =>
@@ -29,8 +29,11 @@ const movesThrough = (stage: string): Move[] =>
     parseMoves(notation),
   )
 
-/** The Solution for the Cube SPLASH_SCRAMBLE leaves. */
-export const SPLASH_SOLUTION: readonly Move[] = movesThrough('rotate-back')
+/** The Cube every pass of the loop starts from: the one SPLASH_SCRAMBLE leaves. */
+export const SPLASH_START: Cube = Cube.solved().apply(SPLASH_SCRAMBLE)
+
+/** The Solution for SPLASH_START. */
+export const SPLASH_SOLUTION: readonly Move[] = movesThrough('yellow-edges')
 
 /** The still Cube shown under reduced motion: partway through the Solution, its white layer finished on top. */
-export const SPLASH_STILL: Cube = Cube.solved().apply([...SPLASH_SCRAMBLE, ...movesThrough('white-corners')])
+export const SPLASH_STILL: Cube = SPLASH_START.apply(movesThrough('white-corners'))
