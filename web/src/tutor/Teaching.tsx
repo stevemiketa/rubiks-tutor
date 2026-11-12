@@ -17,14 +17,18 @@ export function AlgorithmCards({ stage, teaching }: { stage: Stage; teaching: Te
 
   return (
     <ul className="algorithm-cards" aria-label={`${stage.name} Algorithms`}>
-      {algorithms.map(({ name, moves }) => {
+      {algorithms.map((algorithm) => {
+        const { name } = algorithm
         const current = performing?.name === name
+        // The use being performed, which a Cube rotation may have relabeled
+        // or gone into, so the Move highlighted is the one the Cube made.
+        const { moves } = current ? performing : algorithm
         return (
           <li key={name} className="algorithm-card" aria-current={current ? 'true' : undefined}>
             <span className="algorithm-name">{name}</span>{' '}
             <span className="notation algorithm-moves">
               {moves.map((move, i) => (
-                // An Algorithm's Moves never change, so the index is a stable key.
+                // Each item is only a Move's notation, so the index is a fine key.
                 <Fragment key={i}>
                   {i > 0 && ' '}
                   <span className={current && performing.step === i ? 'performing' : undefined}>{formatMove(move)}</span>

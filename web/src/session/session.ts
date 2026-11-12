@@ -290,10 +290,10 @@ export class Session {
   /**
    * What Playback teaches at its position in the loaded Solution: the Stage,
    * the Move reached with its note, and the Algorithm being performed.
-   * Undefined with no Solution loaded, or one with no Stages.
+   * Undefined with no Solution loaded, a stale one, or one with no Stages.
    */
   get teaching(): Teaching | undefined {
-    const loaded = this.#fields.solution
+    const loaded = this.#playable
     return loaded && teachingAt(loaded.solution, loaded.position)
   }
 

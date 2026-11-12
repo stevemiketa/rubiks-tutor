@@ -77,8 +77,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
             <ScramblePanel
               scramble={session.scramble}
               confirming={state.confirming === 'new-scramble'}
-              // Undone Moves count too: redo could bring them back. So do Moves played from a Solution.
-              movesMade={session.history.length + session.undone.length + session.position}
+              movesMade={session.movesMade}
               onNewScramble={() => tutor.newScramble()}
               onConfirm={() => tutor.confirmNewScramble()}
               onCancel={() => tutor.cancelNewScramble()}
@@ -88,6 +87,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               status={state.solveStatus}
               disabled={waiting}
               onSolve={() => void tutor.solve()}
+              onClose={() => tutor.closeSolution()}
               playback={tutor}
             />
             <TurnControls selected={state.selected} disabled={waiting} onTurn={(direction) => tutor.turn(direction)} />
@@ -96,6 +96,8 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               moves={session.history}
               canUndo={session.canUndo && !waiting}
               canRedo={session.canRedo && !waiting}
+              // While a Solution is loaded, and not stale, undo and redo step through it.
+              stepsSolution={session.solution !== undefined && !session.stale}
               onUndo={() => tutor.undo()}
               onRedo={() => tutor.redo()}
             />

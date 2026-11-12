@@ -119,6 +119,13 @@ describe('a manual Turn while a Solution is loaded', () => {
     expect(stale.jumpToStage(1)).toBe(stale)
   })
 
+  it('teaches nothing from a stale Solution: no Stage, Move or Pieces for a Cube the learner no longer has', () => {
+    const played = steps(loaded(), 5)
+    expect(played.teaching?.stage.id).toBe('white-corners')
+
+    expect(played.move(move('F')).teaching).toBeUndefined()
+  })
+
   it('leaves later Moves, undo and redo to act on the Move history while the Solution is stale', () => {
     const stale = steps(loaded(), 2).move(move('F'))
 
@@ -277,6 +284,29 @@ describe('a Cube rotation while a Solution is loaded', () => {
     expect(rotated.position).toBe(7)
   })
 
+  // Hand-written, for the Cube "R U F" makes: a Stage an earlier one
+  // finished has no Moves, and the last Stage may be one.
+  const withEmptyStages = solutionOf({
+    solved: false,
+    stages: [
+      { id: 'yellow-cross', name: 'Yellow cross', goal: 'g', moves: "F' U'", notes: [], algorithms: [], pieces: [] },
+      { id: 'yellow-face', name: 'Yellow face', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
+      { id: 'yellow-corners', name: 'Yellow corners', goal: 'g', moves: "R'", notes: [], algorithms: [], pieces: [] },
+      { id: 'yellow-edges', name: 'Yellow edges', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
+    ],
+  })
+  const emptyStagesLoaded = () => Session.start(parseMoves('R U F')).loadSolution(withEmptyStages)
+
+  it('goes into the Stage of the last Move played, never a Stage with no Moves', () => {
+    const atBoundary = steps(emptyStagesLoaded(), 2).move(move('y'))
+    expect(stageMoves(atBoundary)).toEqual(["F' U' y", '', "F'", ''])
+    expect(steps(atBoundary, 1).isSolved()).toBe(true)
+
+    const atEnd = steps(emptyStagesLoaded(), 3).move(move('x'))
+    expect(stageMoves(atEnd)).toEqual(["F' U'", '', "R' x", ''])
+    expect(atEnd.isSolved()).toBe(true)
+  })
+
   it('joins the Move history when the Solution has no Stages to put it in', () => {
     const empty = solutionOf({ solved: false, stages: [] })
     const rotated = Session.start(parseMoves(recordedScramble)).loadSolution(empty).move(move('y'))
@@ -332,6 +362,22 @@ describe('saving a loaded Solution in browser storage', () => {
     expect(formatMoves(restored?.history ?? [])).toBe("M M'")
     expect(restored?.cube.toString()).toBe(session.cube.toString())
     expect(restored && steps(restored, 13).isSolved()).toBe(true)
+  })
+
+  it('restores Stages with no Moves', () => {
+    const solution = solutionOf({
+      solved: false,
+      stages: [
+        { id: 'yellow-corners', name: 'Yellow corners', goal: 'g', moves: "U' R'", notes: [], algorithms: [], pieces: [] },
+        { id: 'yellow-edges', name: 'Yellow edges', goal: 'g', moves: '', notes: [], algorithms: [], pieces: [] },
+      ],
+    })
+
+    const restored = reload(steps(Session.start(parseMoves('R U')).loadSolution(solution), 2))
+
+    expect(restored?.solution).toEqual(solution)
+    expect(restored?.position).toBe(2)
+    expect(restored?.isSolved()).toBe(true)
   })
 
   it('restores a stale Solution as stale', () => {

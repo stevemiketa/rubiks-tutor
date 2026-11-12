@@ -436,6 +436,37 @@ a {
   margin: 0;
 }
 
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* A manual Turn made the Solution stale: Solve again, or close it. */
+.stale-solution {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #d97706;
+  border-radius: 0.5rem;
+  background: #1f2937;
+}
+
+.panel .stale-solution p {
+  margin: 0;
+}
+
+.stage-list.stale {
+  opacity: 0.55;
+}
+
+.stage-list.stale .stage-name {
+  cursor: default;
+}
+
 /* Each Stage's name jumps to it; its Moves follow in notation. The list
    scrolls by itself to keep the current Move in view. */
 .stage-list {
@@ -460,7 +491,7 @@ a {
   cursor: pointer;
 }
 
-.stage-name:hover,
+.stage-name:enabled:hover,
 .stage-name:focus-visible {
   color: #8ab4ff;
   text-decoration: underline;
