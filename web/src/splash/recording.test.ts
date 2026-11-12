@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Cube, formatMoves, invert, isRotation, type Move } from '../cube/index.ts'
+import { Cube, formatMoves, invert, isRotation, stickerAt, type Move } from '../cube/index.ts'
 import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
 const OUTER = new Set(['R', 'L', 'U', 'D', 'F', 'B'])
@@ -28,7 +28,7 @@ describe('the splash page recording', () => {
   it('leaves the scrambled Cube solved, with yellow on top', () => {
     const end = Cube.solved().apply([...SPLASH_SCRAMBLE, ...SPLASH_SOLUTION])
     expect(end.isSolved()).toBe(true)
-    expect(end.toString().slice(0, 9)).toBe('YYYYYYYYY')
+    expect(end.at(stickerAt('U', 1, 1))).toBe('yellow')
   })
 
   it('ends the moment the Cube is solved', () => {
