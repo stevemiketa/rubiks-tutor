@@ -4,7 +4,12 @@ BIN := bin/cubular
 NODE_DEPS := web/node_modules/.package-lock.json
 
 .DEFAULT_GOAL := help
-.PHONY: help deps build run test-go typecheck test-web check-manifests e2e-browsers e2e gate clean
+.PHONY: help deps build run test-go govulncheck typecheck test-web check-manifests e2e-browsers e2e gate clean
+
+# govulncheck reports only the vulnerabilities the code can reach, in the
+# modules it uses and in the standard library of the Go running it: the
+# version in go.mod.
+GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
 # check-manifests runs these tools with `go run`, at these versions, and
 # validates against the schemas of this Kubernetes release: the oldest one
@@ -36,6 +41,9 @@ test-go: ## Gate: gofmt check, go vet and Go tests
 	go vet ./...
 	go test ./...
 
+govulncheck: ## Gate: fail on any known vulnerability the Go code can reach
+	go run $(GOVULNCHECK) ./...
+
 typecheck: $(NODE_DEPS) ## Gate: TypeScript type-check
 	cd web && npm run typecheck
 
@@ -54,7 +62,7 @@ e2e-browsers: $(NODE_DEPS) ## Install the browser Playwright uses (no-op once in
 e2e: build e2e-browsers ## Gate: Playwright journeys against the built binary
 	cd web && npm run e2e
 
-gate: test-go typecheck test-web check-manifests e2e ## Run the whole gate, as CI does
+gate: test-go govulncheck typecheck test-web check-manifests e2e ## Run the whole gate, as CI does
 
 clean: ## Remove build output
 	rm -rf bin web/dist/site web/playwright-report web/test-results

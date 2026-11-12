@@ -13,7 +13,9 @@ The manifests don't provision Postgres. You provide the database, and Cubular re
 
 The `Dockerfile` builds the frontend with Node, builds the Go binary with the frontend embedded, and copies the binary alone onto a distroless base. The server runs as the non-root user 65532, and with a Postgres `DATABASE_URL` it writes nothing to its filesystem.
 
-On every push to `master`, the `Image` workflow builds the image for linux/amd64 and linux/arm64, smoke-tests it, and pushes it to GHCR, tagged with the full commit SHA. Pull requests build and smoke-test it without pushing.
+CI builds the image on every pull request and every push to `master`, on a linux/amd64 runner and on a linux/arm64 runner, and smoke-tests each build. The smoke test starts the image, checks `/healthz`, `/readyz` and the page, and checks that the server runs as user 65532.
+
+On `master`, each runner then pushes the image it tested to GHCR, untagged. Once every gate job and both smoke tests have passed, CI tags that pair with the full commit SHA. A commit that fails the gate gets no tag, so every tag names an image that passed the gate.
 
 To build and run it locally:
 
@@ -24,7 +26,7 @@ docker run --rm -p 8080:8080 cubular
 
 Without `DATABASE_URL`, it keeps Snapshots in a SQLite file inside the container, which is lost when the container goes.
 
-New GHCR packages are private. Make the package public in its settings, or give the Deployment an `imagePullSecrets` entry for a Secret that can pull it.
+The package is public, so the cluster pulls it without credentials. New GHCR packages start private. If the package is ever recreated, make it public again in its settings, or give the Deployment an `imagePullSecrets` entry for a Secret that can pull it.
 
 ## What to provide before applying
 
@@ -50,7 +52,7 @@ Fill these in in `overlays/self-hosted/`, where each is marked "Fill in":
 | TLS Secret | `ingress.yaml`: `tls[].secretName` | `cubular-tls` | The name of the TLS Secret for that host |
 | `PUBLIC_BASE_URL` | `kustomization.yaml`: `configMapGenerator` | `https://cubular.example.com` | `https://` and the host. Share links are built from it |
 | `TRUSTED_PROXIES` | `kustomization.yaml`: `configMapGenerator` | `10.42.0.0/16` | The CIDR range the ingress controller connects to Cubular from: its Pods' range (`10.42.0.0/16` is k3s's default), or the nodes' addresses if it uses host networking. Separate several with commas |
-| Image tag | `kustomization.yaml`: `images[].newTag` | `COMMIT_SHA` | The full SHA of a `master` commit whose `Image` workflow succeeded |
+| Image tag | `kustomization.yaml`: `images[].newTag` | `COMMIT_SHA` | The full SHA of a `master` commit whose CI run succeeded. Only those commits get a tag |
 
 Cubular believes `X-Forwarded-For` only from `TRUSTED_PROXIES`, and rate-limits sharing by the client address it finds there. If the range misses the ingress controller, every client looks like the controller and they all share one limit. If it's wider than the controllers, anything else in it can forge client addresses. The controller must also see the real client address: behind a load balancer, that can mean `externalTrafficPolicy: Local` on the controller's Service, or the PROXY protocol.
 
