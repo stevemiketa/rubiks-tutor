@@ -47,7 +47,7 @@ The server reads its configuration from environment variables:
 | Variable | Default | Meaning |
 |---|---|---|
 | `PORT` | `8080` | TCP port to listen on; `0` picks a free one |
-| `DATABASE_URL` | `sqlite:cubular.db` | Where Snapshots are stored. `sqlite:<path>` is a SQLite file, created if missing; the path is relative to the working directory unless it starts with `/`, as in `sqlite:///var/lib/cubular/cubular.db`. Migrations run at startup |
+| `DATABASE_URL` | `sqlite:cubular.db` | Where Snapshots are stored. `sqlite:<path>` is a SQLite file, created if missing; the path is relative to the working directory unless it starts with `/`, as in `sqlite:///var/lib/cubular/cubular.db`. A `postgres://` or `postgresql://` URL is a Postgres database, as in `postgres://cubular:<password>@db.example:5432/cubular?sslmode=require`; production uses Postgres so that replicas can share it. Migrations run at startup, one process at a time, and `GET /readyz` answers 503 while the database can't be reached, after waiting at most a second for it |
 | `PUBLIC_BASE_URL` | the request's own address | Where share links point, such as `https://cubular.example` |
 | `TRUSTED_PROXIES` | none | Comma-separated CIDR ranges or addresses whose `X-Forwarded-For` headers are believed when rate limiting. Requests from anywhere else count as coming from their connection's address |
 | `SHARE_LIMIT_PER_HOUR` | `30` | How many Snapshots one client may share an hour, per replica. IPv6 clients are counted per /64 |
@@ -59,7 +59,26 @@ Logs are structured JSON on stdout, one line per request.
 
 A share link points to a Snapshot stored on the server under an ID made from a hash of its contents ([ADR 0003](docs/adr/0003-server-stored-snapshots.md)). Snapshots are never changed or deleted, so the database must never be dropped or wiped.
 
-Every Snapshot store runs the same contract suite, `internal/snapshot/storetest` ([ADR 0004](docs/adr/0004-sqlite-locally-postgres-in-production.md)); `make test-go` runs it against SQLite. Its ID-collision case uses two Snapshots found by `go run ./internal/snapshot/storetest/findcollision.go`, which only needs rerunning if the Snapshot body format gets a new version.
+Every Snapshot store runs the same contract suite, `internal/snapshot/storetest` ([ADR 0004](docs/adr/0004-sqlite-locally-postgres-in-production.md)). `make test-go` always runs it against SQLite, and against Postgres too when `CUBULAR_TEST_POSTGRES_URL` names a Postgres database; CI sets it, using a Postgres service container. Its ID-collision case uses two Snapshots found by `go run ./internal/snapshot/storetest/findcollision.go`, which only needs rerunning if the Snapshot body format gets a new version.
+
+## Running against Postgres locally
+
+Production stores Snapshots in Postgres. To reproduce a production-only problem, start a throwaway Postgres in Docker and point `DATABASE_URL` at it:
+
+```sh
+docker run --rm -d --name cubular-postgres -e POSTGRES_PASSWORD=cubular -p 127.0.0.1:5432:5432 postgres:18-alpine
+DATABASE_URL='postgres://postgres:cubular@localhost:5432/postgres?sslmode=disable' make run
+```
+
+Cubular creates its tables on startup. `docker stop cubular-postgres` throws the database away. Use another host port, such as `-p 127.0.0.1:55432:5432` and `localhost:55432` in the URL, if 5432 is taken.
+
+To run the Postgres tests against the same database:
+
+```sh
+CUBULAR_TEST_POSTGRES_URL='postgres://postgres:cubular@localhost:5432/postgres?sslmode=disable' make test-go
+```
+
+They need a user who may create schemas: each test works in a new schema, which it drops when it ends, so they leave nothing behind. Several runs can share one database at once. Without `CUBULAR_TEST_POSTGRES_URL` they're skipped, except in CI (where `CI` is set), where they fail.
 
 ## Layout
 
@@ -68,15 +87,15 @@ Every Snapshot store runs the same contract suite, `internal/snapshot/storetest`
 | `cmd/cubular/` | The server's entry point: configuration, listening, graceful shutdown |
 | `internal/server/` | The HTTP router and its tests, which drive it in-process, including the solver's property tests through `POST /api/solve`, share rate limiting, and working out client addresses behind trusted proxies |
 | `internal/snapshot/` | Snapshots: validation, the canonical body and its IDs, and the `Store` interface, with its contract suite in `storetest/` |
-| `internal/store/` | The SQL Snapshot store: SQLite, chosen by `DATABASE_URL`, with migrations in `migrations/<database>/` embedded in the binary |
+| `internal/store/` | The SQL Snapshot store: SQLite or Postgres, chosen by `DATABASE_URL`, with migrations in `migrations/<database>/` embedded in the binary. `pgtest/` gives tests the Postgres database in `CUBULAR_TEST_POSTGRES_URL` |
 | `internal/cube/` | The Go cube model: Cube state, notation, Moves, relabeling and Pieces. Its package doc defines the Sticker layout both models share |
 | `internal/solver/` | The beginner's-Method solver ([ADR 0001](docs/adr/0001-own-method-based-solver-in-go.md)): a pipeline of Stages, each with its goal, Moves, notes, Algorithms and Pieces |
 | `testdata/cube/` | The shared cube test cases, which both cube models must pass |
 | `web/` | The React frontend (Vite, TypeScript) |
 | `web/embed.go` | Embeds the built frontend (`web/dist/site/`) into the binary |
 | `web/src/cube/` | The TypeScript cube model, the same as the Go one |
-| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, sharing and opening Snapshots, and `Tutor`, which the tutor page reads |
-| `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves; shared by the tutor and the splash page |
+| `web/src/session/` | The Session model, with no rendering code: the Session with undo and redo, Scrambles, saving the Session in browser storage, the turning, rotating and selection controls, snapping a drag to Cube rotations, the queue of Moves to animate, Solutions from the solver and Playback through them, what Playback teaches at each position (the Stage, the Algorithm being performed, and each Move's note), sharing and opening Snapshots, and `Tutor`, which the tutor page reads |
+| `web/src/scene/` | The 3D Cube (react-three-fiber), which animates a queue of Moves and can highlight some Pieces and dim the rest; shared by the tutor and the splash page |
 | `web/src/tutor/` | The tutor page's controls and panels |
 | `web/src/splash/` | The splash page's prerecorded scramble-and-solve, and the loop that plays it |
 | `web/src/routing/` | Client-side routing between the splash page and the tutor |

@@ -40,11 +40,13 @@ func newTestServerLoggingTo(t *testing.T, logger *slog.Logger) http.Handler {
 // a real SQLite Snapshot store in a temporary directory, and logs discarded.
 func testConfig(t *testing.T) server.Config {
 	t.Helper()
-	snapshots, err := store.Open(t.Context(), "sqlite:"+filepath.Join(t.TempDir(), "cubular.db"))
-	if err != nil {
-		t.Fatalf("opening the Snapshot store: %v", err)
-	}
-	t.Cleanup(func() { _ = snapshots.Close() })
+	return configFor(t, openStore(t, "sqlite:"+filepath.Join(t.TempDir(), "cubular.db")))
+}
+
+// configFor is testConfig with the Snapshot store snapshots, which readiness
+// checks, as cmd/cubular wires it.
+func configFor(t *testing.T, snapshots *store.Store) server.Config {
+	t.Helper()
 	return server.Config{
 		Frontend: fstest.MapFS{
 			"index.html":               {Data: []byte(entryPage)},
@@ -52,7 +54,19 @@ func testConfig(t *testing.T) server.Config {
 		},
 		Logger:    slog.New(slog.DiscardHandler),
 		Snapshots: snapshots,
+		Ready:     snapshots.Ping,
 	}
+}
+
+// openStore opens the Snapshot store databaseURL names, closed when t ends.
+func openStore(t *testing.T, databaseURL string) *store.Store {
+	t.Helper()
+	snapshots, err := store.Open(t.Context(), databaseURL)
+	if err != nil {
+		t.Fatalf("opening the Snapshot store: %v", err)
+	}
+	t.Cleanup(func() { _ = snapshots.Close() })
+	return snapshots
 }
 
 func get(t *testing.T, h http.Handler, path string) *http.Response {

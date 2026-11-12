@@ -1,11 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { formatMove } from '../cube/index.ts'
-import { stageStarts, type Session, type Solution, type SolveStatus } from '../session/index.ts'
+import { stageStarts, type Session, type Solution, type SolveStatus, type Teaching } from '../session/index.ts'
 import { PlaybackControls, type Playback } from './PlaybackControls.tsx'
+import { AlgorithmCards, ReachedMove } from './Teaching.tsx'
 
 /**
  * The Solve button and, once a Solution is loaded, its Stages, each with its
- * Moves in notation, and the Playback controls. Also says when the Cube is
+ * goal, its Algorithm cards and its Moves in notation, the Move Playback has
+ * reached with its note, and the Playback controls. Also says when the Cube is
  * already solved, and offers a retry when Solve fails.
  */
 export function SolutionPanel({
@@ -61,8 +63,10 @@ export function SolutionPanel({
           <StageList
             solution={solution}
             position={session.position}
+            teaching={session.teaching}
             onJump={(index) => playback.jumpToStage(index)}
           />
+          <ReachedMove teaching={session.teaching} />
           <PlaybackControls session={session} playback={playback} />
         </>
       )}
@@ -72,16 +76,19 @@ export function SolutionPanel({
 
 /**
  * The Solution's Stages by name, each a button that jumps to its first
- * Move, with its Moves in notation below. The Move the Cube made last is
- * highlighted, and kept in view as Playback goes.
+ * Move, with its goal, its Algorithm cards and its Moves in notation below.
+ * The Stage Playback is in, the Algorithm being performed and the Move the
+ * Cube made last are highlighted, and kept in view as Playback goes.
  */
 function StageList({
   solution,
   position,
+  teaching,
   onJump,
 }: {
   solution: Solution
   position: number
+  teaching: Teaching | undefined
   onJump: (index: number) => void
 }) {
   const list = useRef<HTMLOListElement>(null)
@@ -103,10 +110,12 @@ function StageList({
       {solution.stages.map((stage, i) => {
         const start = starts[i] ?? 0
         return (
-          <li key={stage.id}>
+          <li key={stage.id} aria-current={stage.id === teaching?.stage.id ? 'true' : undefined}>
             <button type="button" className="stage-name" title="Jump to this Stage’s first Move" onClick={() => onJump(i)}>
               {stage.name}
             </button>
+            <p className="stage-goal">{stage.goal}</p>
+            <AlgorithmCards stage={stage} teaching={teaching} />
             {stage.moves.length === 0 ? (
               <p className="muted">Already finished.</p>
             ) : (

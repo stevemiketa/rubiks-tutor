@@ -29,6 +29,12 @@ export interface CubeViewProps {
    * Cube that can't be dragged.
    */
   readonly onRotate?: (rotations: readonly Move[]) => void
+  /**
+   * Pieces to highlight, by name, such as 'white-green edge'; every other
+   * Piece is dimmed. The highlight follows the Pieces as they move. Omit to
+   * highlight none and dim none.
+   */
+  readonly highlighted?: readonly string[]
   /** A text description of the view, for screen readers. */
   readonly label: string
   readonly className?: string
@@ -43,7 +49,7 @@ export function CubeView(props: CubeViewProps) {
   )
 }
 
-function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, label, className }: CubeViewProps) {
+function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, highlighted, label, className }: CubeViewProps) {
   const classes = ['cube-view', onRotate && 'draggable', className].filter(Boolean).join(' ')
   return (
     <div className={classes} role="img" aria-label={label}>
@@ -52,13 +58,20 @@ function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, label, cl
         <ambientLight intensity={1.6} />
         <directionalLight position={[3, 8, 5]} intensity={1.8} />
         <directionalLight position={[-4, -2, 6]} intensity={0.5} />
-        <AnimatedCube queue={queue} selected={selected} onSelect={onSelect} selectable={selectable} onRotate={onRotate} />
+        <AnimatedCube
+          queue={queue}
+          selected={selected}
+          onSelect={onSelect}
+          selectable={selectable}
+          onRotate={onRotate}
+          highlighted={highlighted}
+        />
       </Canvas>
     </div>
   )
 }
 
-type AnimatedCubeProps = Pick<CubeViewProps, 'queue' | 'selected' | 'onSelect' | 'selectable' | 'onRotate'>
+type AnimatedCubeProps = Pick<CubeViewProps, 'queue' | 'selected' | 'onSelect' | 'selectable' | 'onRotate' | 'highlighted'>
 
 // A drag turns the Cube this far for each pixel, so dragging across half the
 // view makes about a quarter turn.
@@ -77,7 +90,7 @@ function quaternionOf(move: Move): THREE.Quaternion {
 
 const prefersReducedMotion = (): boolean => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
-function AnimatedCube({ queue, selected, onSelect, selectable, onRotate }: AnimatedCubeProps) {
+function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted }: AnimatedCubeProps) {
   const model = useMemo(() => new CubeModel(), [])
   // Turns the whole Cube while it is dragged and as it settles square-on.
   // The Moves it shows are in the model, so between drags it is at rest.
@@ -106,6 +119,11 @@ function AnimatedCube({ queue, selected, onSelect, selectable, onRotate }: Anima
     model.select(selected)
     invalidate()
   }, [model, selected, invalidate])
+
+  useEffect(() => {
+    model.highlight(highlighted)
+    invalidate()
+  }, [model, highlighted, invalidate])
 
   useEffect(() => {
     if (onRotate === undefined) return

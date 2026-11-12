@@ -124,7 +124,9 @@ func Run(t *testing.T, newStore func(t *testing.T) snapshot.Store) {
 		store := newStore(t)
 		id := save(t, store, unique(t, ""))
 
-		for _, unknown := range []string{"", "nope", id[:len(id)-1], id + "A", strings.ToUpper(id), "Ab3_x-9QzK", strings.Repeat("A", 100)} {
+		// IDs come from URL paths, which can spell any bytes: "\xff" is
+		// not UTF-8, and Postgres stores no text with a NUL in it.
+		for _, unknown := range []string{"", "nope", id[:len(id)-1], id + "A", strings.ToUpper(id), "Ab3_x-9QzK", strings.Repeat("A", 100), "\xff", id[:5] + "\x00" + id[6:]} {
 			if unknown == id {
 				continue
 			}
