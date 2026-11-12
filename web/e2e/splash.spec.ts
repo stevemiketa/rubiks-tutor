@@ -24,14 +24,14 @@ const WITHOUT_WEBGL = `{
 
 const NO_WEBGL_EXPLANATION = /can.t show the 3D Cube/
 
-test('the splash page shows the Cube scrambling and solving itself, without calling the server', async ({ page, baseURL }) => {
+test('the splash page shows the Cube solving itself, without calling the server', async ({ page, baseURL }) => {
   const requests: URL[] = []
   page.on('request', (request) => requests.push(new URL(request.url())))
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Cubular' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Start solving' })).toBeVisible()
-  await expect(cubeView(page)).toBeVisible()
+  await expect(page.getByRole('img', { name: 'The Cube solving itself' })).toBeVisible()
 
   // Before the first frame, the first frame, then the Cube moving.
   const pictures = new Set<string>()

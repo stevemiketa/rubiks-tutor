@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import { Cube, formatMoves, invert, isRotation, type Move } from '../cube/index.ts'
 import { SPLASH_SCRAMBLE, SPLASH_SOLUTION } from './recording.ts'
 
-const SOLVED = 'WWWWWWWWW RRRRRRRRR GGGGGGGGG YYYYYYYYY OOOOOOOOO BBBBBBBBB'
 const OUTER = new Set(['R', 'L', 'U', 'D', 'F', 'B'])
 const AXIS: Readonly<Record<string, string>> = { R: 'x', L: 'x', U: 'y', D: 'y', F: 'z', B: 'z' }
 const axisOf = (m: Move): string => AXIS[m.letter] ?? m.letter
@@ -26,9 +25,15 @@ describe('the splash page recording', () => {
     expect(Cube.solved().apply(SPLASH_SCRAMBLE).isSolved()).toBe(false)
   })
 
-  it('solves the scrambled Cube back to the exact Cube it started from, so the loop restarts without a jump', () => {
+  it('leaves the scrambled Cube solved, with yellow on top', () => {
     const end = Cube.solved().apply([...SPLASH_SCRAMBLE, ...SPLASH_SOLUTION])
-    expect(end.toString()).toBe(SOLVED)
+    expect(end.isSolved()).toBe(true)
+    expect(end.toString().slice(0, 9)).toBe('YYYYYYYYY')
+  })
+
+  it('ends the moment the Cube is solved', () => {
+    const beforeLast = Cube.solved().apply([...SPLASH_SCRAMBLE, ...SPLASH_SOLUTION.slice(0, -1)])
+    expect(beforeLast.isSolved()).toBe(false)
   })
 
   it('solves the Cube rather than playing the scramble backwards', () => {
