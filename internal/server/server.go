@@ -28,6 +28,7 @@ func New(cfg Config) http.Handler {
 	mux.HandleFunc("GET /healthz", handleHealth)
 	// Readiness gains a database check once there is a database.
 	mux.HandleFunc("GET /readyz", handleHealth)
+	mux.HandleFunc("POST /api/solve", handleSolve)
 
 	entryPage := entryPageHandler(cfg.Frontend, cfg.Logger)
 	mux.Handle("GET /{$}", entryPage)
