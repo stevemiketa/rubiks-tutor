@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { canRenderWebGL } from '../scene/webgl.tsx'
 import { SessionStore, Tutor, browserStorage, commandForKey, type TutorState } from '../session/index.ts'
 
 /**
@@ -13,7 +14,13 @@ export function useTutor(): { tutor: Tutor; state: TutorState } {
   // StrictMode calls this twice in development and keeps the first Tutor. The
   // second finds the Session the first saved, so the two agree.
   const [tutor] = useState(() =>
-    Tutor.open({ store: new SessionStore(browserStorage()), reducedMotion: prefersReducedMotion }),
+    Tutor.open({
+      store: new SessionStore(browserStorage()),
+      // Without WebGL nothing animates the queue, so the Scramble is applied
+      // at once, and so is every Move after it.
+      reducedMotion: () => prefersReducedMotion() || !canRenderWebGL(),
+      animates: canRenderWebGL,
+    }),
   )
   const state = useSyncExternalStore(tutor.subscribe, tutor.getState)
 

@@ -58,6 +58,11 @@ export interface TutorOptions {
    * starts. If so, the Scramble appears already applied instead of playing.
    */
   readonly reducedMotion?: () => boolean
+  /**
+   * Whether there is a scene to animate the queue. If not (no WebGL), each
+   * Move, undo and redo is shown at once instead of queued. True by default.
+   */
+  readonly animates?: () => boolean
 }
 
 export class Tutor {
@@ -168,7 +173,7 @@ export class Tutor {
     const { session, scrambling } = this.#state
     const last = session.history.at(-1)
     if (last === undefined || scrambling) return
-    this.queue.enqueue(inverse(last))
+    this.#show(inverse(last))
     this.#update({ session: session.undo() })
   }
 
@@ -177,7 +182,7 @@ export class Tutor {
     const { session, scrambling } = this.#state
     const next = session.undone.at(-1)
     if (next === undefined || scrambling) return
-    this.queue.enqueue(next)
+    this.#show(next)
     this.#update({ session: session.redo() })
   }
 
@@ -222,8 +227,15 @@ export class Tutor {
   // are ignored.
   #move(move: Move, durationMs?: number): void {
     if (this.#state.scrambling) return
-    this.queue.enqueue(move, durationMs)
+    this.#show(move, durationMs)
     this.#update({ session: this.#state.session.move(move) })
+  }
+
+  // Queues a Move for the scene to animate, or shows it at once when there is
+  // no scene to play the queue.
+  #show(move: Move, durationMs?: number): void {
+    if (this.#options.animates?.() === false) this.queue.jump(this.queue.target.apply([move]))
+    else this.queue.enqueue(move, durationMs)
   }
 
   // Starts a new Session with a fresh Scramble, played from a solved Cube.

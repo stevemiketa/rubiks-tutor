@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatMoves, parseMoves, stickerAt, stickerName, type Face } from '../cube/index.ts'
-import { Tutor, type KeyPress } from './index.ts'
+import { Session, Tutor, type KeyPress } from './index.ts'
 
 const frontCenter = stickerAt('F', 1, 1)
 const frontRightMiddle = stickerAt('F', 1, 2)
@@ -284,6 +284,24 @@ describe('Tutor undo and redo', () => {
     tutor.redo()
     expect(tutor.queue.isIdle).toBe(true)
     expect(tutor.getState()).toBe(before)
+  })
+})
+
+describe('Tutor when nothing can animate', () => {
+  // Without WebGL there is no scene to play the queue, so every Move shows at once.
+  it('shows Turns, Cube rotations, undo and redo at once instead of queueing them', () => {
+    const tutor = new Tutor(Session.start(), { animates: () => false })
+    tutor.select(frontCenter)
+    tutor.press(arrow('ArrowUp'))
+    tutor.rotate('left')
+    tutor.recordDrag(parseMoves('x'))
+    tutor.undo()
+    tutor.undo()
+    tutor.redo()
+
+    expect(history(tutor)).toBe("M' y")
+    expect(tutor.queue.isIdle).toBe(true)
+    expect(tutor.queue.shown.toString()).toBe(tutor.getState().session.cube.toString())
   })
 })
 
