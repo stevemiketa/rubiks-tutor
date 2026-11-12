@@ -42,12 +42,18 @@ describe('SessionStore', () => {
     const storage = new MemoryStorage()
     new SessionStore(storage).save(play(Session.start(parseMoves("R U2 F'")), "M' x y2").undo())
     expect(storage.items.size).toBe(1)
-    expect(JSON.parse(storage.saved ?? '')).toEqual({ version: 2, scramble: "R U2 F'", history: "M' x", undone: 'y2' })
+    expect(JSON.parse(storage.saved ?? '')).toEqual({
+      version: 3,
+      scramble: "R U2 F'",
+      history: "M' x",
+      undone: 'y2',
+      solution: null,
+    })
   })
 
-  it('restores a Session saved in version 2 of the format', () => {
+  it('restores a Session saved in version 3 of the format', () => {
     const storage = new MemoryStorage()
-    storage.setItem('cubular.session', '{"version":2,"scramble":"R U2 F\'","history":"M\' x","undone":"y2 E"}')
+    storage.setItem('cubular.session', '{"version":3,"scramble":"R U2 F\'","history":"M\' x","undone":"y2 E","solution":null}')
 
     const restored = new SessionStore(storage).load()
 
@@ -73,16 +79,16 @@ describe('SessionStore', () => {
   })
 
   it.each([
-    ['not JSON', '{"version":2,'],
+    ['not JSON', '{"version":3,'],
     ['JSON null', 'null'],
     ['a number', '42'],
     ['a list', '[1, "R U"]'],
-    ['no Scramble', '{"version":2,"history":"R","undone":""}'],
-    ['no Move history', '{"version":2,"scramble":"R","undone":""}'],
-    ['no redo stack', '{"version":2,"scramble":"R","history":""}'],
-    ['Moves that aren’t notation', '{"version":2,"scramble":["R"],"history":"","undone":""}'],
-    ['notation with a bad Move', '{"version":2,"scramble":"R","history":"U X","undone":""}'],
-    ['a redo stack with a bad Move', '{"version":2,"scramble":"R","history":"","undone":"Rw"}'],
+    ['no Scramble', '{"version":3,"history":"R","undone":"","solution":null}'],
+    ['no Move history', '{"version":3,"scramble":"R","undone":"","solution":null}'],
+    ['no redo stack', '{"version":3,"scramble":"R","history":"","solution":null}'],
+    ['Moves that aren’t notation', '{"version":3,"scramble":["R"],"history":"","undone":"","solution":null}'],
+    ['notation with a bad Move', '{"version":3,"scramble":"R","history":"U X","undone":"","solution":null}'],
+    ['a redo stack with a bad Move', '{"version":3,"scramble":"R","history":"","undone":"Rw","solution":null}'],
   ])('restores nothing from unreadable data: %s', (_, saved) => {
     const storage = new MemoryStorage()
     storage.setItem('cubular.session', saved)
@@ -90,10 +96,11 @@ describe('SessionStore', () => {
   })
 
   it.each([
-    ['no version', '{"scramble":"R","history":"","undone":""}'],
+    ['no version', '{"scramble":"R","history":"","undone":"","solution":null}'],
     ['version 1, from before undo and redo', '{"version":1,"scramble":"R","history":""}'],
-    ['a newer version', '{"version":3,"scramble":"R","history":"","undone":""}'],
-    ['a version as text', '{"version":"2","scramble":"R","history":"","undone":""}'],
+    ['version 2, from before Solutions were saved', '{"version":2,"scramble":"R","history":"","undone":""}'],
+    ['a newer version', '{"version":4,"scramble":"R","history":"","undone":"","solution":null}'],
+    ['a version as text', '{"version":"3","scramble":"R","history":"","undone":"","solution":null}'],
   ])('restores nothing from data in another format: %s', (_, saved) => {
     const storage = new MemoryStorage()
     storage.setItem('cubular.session', saved)

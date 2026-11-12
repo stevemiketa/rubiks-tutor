@@ -26,6 +26,13 @@ const PAINT: Readonly<Record<Color, string>> = {
   orange: '#ff6a00',
 }
 
+/**
+ * How far a dimmed Piece's Stickers fade toward this color, the Cube's
+ * background: enough to step back, not so far that their colors are lost.
+ */
+const DIM_TOWARD = '#11131a'
+const DIM_AMOUNT = 0.8
+
 /** The selection marker's color: unlike any Sticker, and bright on black. */
 const MARKER_COLOR = '#ff3fd2'
 
@@ -81,6 +88,10 @@ export class CubeModel extends THREE.Group {
   readonly #stickers: THREE.Mesh[] = []
   readonly #marker: THREE.Mesh
   readonly #paints: Readonly<Record<Color, THREE.Material>>
+  readonly #dimPaints: Readonly<Record<Color, THREE.Material>>
+  // The Cube state drawn, and the Pieces highlighted (by name), if any are.
+  #cube: Cube | undefined
+  #highlighted: ReadonlySet<string> | undefined
   readonly #disposables: { dispose(): void }[] = []
   #turn: { axis: THREE.Vector3; angle: number } | undefined
 
@@ -92,8 +103,14 @@ export class CubeModel extends THREE.Group {
     const plastic = new THREE.MeshStandardMaterial({ color: '#16181d', roughness: 0.55 })
     const sticker = new THREE.ShapeGeometry(roundedSquare(STICKER_SIZE, 0.09))
     const paints = {} as Record<Color, THREE.Material>
-    for (const c of COLORS) paints[c] = new THREE.MeshStandardMaterial({ color: PAINT[c], roughness: 0.4 })
+    const dimPaints = {} as Record<Color, THREE.Material>
+    for (const c of COLORS) {
+      paints[c] = new THREE.MeshStandardMaterial({ color: PAINT[c], roughness: 0.4 })
+      const dim = new THREE.Color(PAINT[c]).lerp(new THREE.Color(DIM_TOWARD), DIM_AMOUNT)
+      dimPaints[c] = new THREE.MeshStandardMaterial({ color: dim, roughness: 0.6 })
+    }
     this.#paints = paints
+    this.#dimPaints = dimPaints
 
     for (const slot of SLOTS) {
       const piece = new THREE.Group()
@@ -123,7 +140,15 @@ export class CubeModel extends THREE.Group {
     this.#marker.raycast = () => {}
 
     this.add(this.#pieces, this.#layer, this.#marker)
-    this.#disposables.push(body, plastic, sticker, ringGeometry, markerPaint, ...Object.values(paints))
+    this.#disposables.push(
+      body,
+      plastic,
+      sticker,
+      ringGeometry,
+      markerPaint,
+      ...Object.values(paints),
+      ...Object.values(dimPaints),
+    )
   }
 
   /** The Sticker a pointer hit, if it hit one. */
@@ -134,8 +159,33 @@ export class CubeModel extends THREE.Group {
 
   /** Paints every Sticker from a Cube state. Call it only between Moves. */
   show(cube: Cube): void {
+    this.#cube = cube
+    this.#paint()
+  }
+
+  /**
+   * Highlights some Pieces, by name, and dims all the others; undefined
+   * highlights none and dims none. A Piece is found by its colors wherever
+   * it is, so the highlight follows it through every Move. Mid-Move, the
+   * Pieces turning keep it as they turn.
+   */
+  highlight(pieces: readonly string[] | undefined): void {
+    this.#highlighted = pieces && new Set(pieces)
+    this.#paint()
+  }
+
+  // Paints each Sticker its color in the Cube state drawn, dimmed unless its
+  // Piece is highlighted (when some are).
+  #paint(): void {
+    const cube = this.#cube
+    if (cube === undefined) return
+    const highlighted = this.#highlighted
+    const dimmed = new Set<string>()
+    if (highlighted !== undefined) {
+      for (const slot of SLOTS) if (!highlighted.has(cube.pieceAt(slot.name))) dimmed.add(slot.name)
+    }
     this.#stickers.forEach((mesh, s) => {
-      mesh.material = this.#paints[cube.at(s)]
+      mesh.material = (dimmed.has(slotOf(s).name) ? this.#dimPaints : this.#paints)[cube.at(s)]
     })
   }
 

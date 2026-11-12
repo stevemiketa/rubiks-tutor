@@ -65,8 +65,8 @@ type stageSpec struct {
 	solve func(b *builder)
 }
 
-// method lists the Method's Stages in order. Stages 4-7 slot in here.
-var method = []stageSpec{whiteCross, whiteCorners, middleEdges}
+// method lists the Method's Stages in order.
+var method = []stageSpec{whiteCross, whiteCorners, middleEdges, yellowCross, yellowFace, yellowCorners, yellowEdges}
 
 // Solve returns the Solution for a Cube.
 func Solve(c cube.Cube) Solution {

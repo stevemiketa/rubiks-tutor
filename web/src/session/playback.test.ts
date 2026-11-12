@@ -1,7 +1,7 @@
 // A Solution loaded into a Session: Playback is a position in it, not a timer.
 import { describe, expect, it } from 'vitest'
 import { formatMoves, parseMoves } from '../cube/index.ts'
-import { PLAYBACK_SPEEDS, Session, SessionStore, parseSolveResponse, type Solution, type StorageLike } from './index.ts'
+import { PLAYBACK_SPEEDS, Session, parseSolveResponse, type Solution } from './index.ts'
 
 // A small hand-written Solution for the Cube "R U" makes: its one Stage undoes it.
 const scramble = parseMoves('R U')
@@ -106,26 +106,6 @@ describe('Session with a Solution', () => {
     expect(closed.cube.toString()).toBe(played.cube.toString())
   })
 
-  it('closes the Solution when the learner makes a Move, adding it after the Moves played', () => {
-    const session = Session.start(scramble).loadSolution(solution).play().playNext().move(parseMoves('F')[0]!)
-
-    expect(session.solution).toBeUndefined()
-    expect(session.playing).toBe(false)
-    expect(formatMoves(session.history)).toBe("U' F")
-    expect(session.cube.toString()).toBe(Session.start(parseMoves("R U U' F")).cube.toString())
-  })
-
-  it('closes the Solution before undoing, so undo takes back the last Move played', () => {
-    const played = Session.start(scramble).move(parseMoves('M')[0]!).loadSolution(solutionOf("M' U' R'")).stepForward()
-    expect(played.canUndo).toBe(true)
-
-    const undone = played.undo()
-
-    expect(undone.solution).toBeUndefined()
-    expect(formatMoves(undone.history)).toBe('M')
-    expect(undone.cube.toString()).toBe(Session.start(parseMoves('R U M')).cube.toString())
-  })
-
   it('loading a new Solution closes the one before', () => {
     const session = Session.start(scramble).loadSolution(solution).stepForward().loadSolution(solutionOf("R'"))
 
@@ -134,18 +114,6 @@ describe('Session with a Solution', () => {
     expect(session.stepForward().isSolved()).toBe(true)
   })
 
-  it('saves the Cube as it is: the Moves played join the Move history, and the Solution itself isn’t saved', () => {
-    const items = new Map<string, string>()
-    const storage: StorageLike = { getItem: (k) => items.get(k) ?? null, setItem: (k, v) => void items.set(k, v) }
-    const played = Session.start(scramble).loadSolution(solution).stepForward()
-
-    new SessionStore(storage).save(played)
-    const restored = new SessionStore(storage).load()
-
-    expect(restored?.solution).toBeUndefined()
-    expect(formatMoves(restored?.history ?? [])).toBe("U'")
-    expect(restored?.cube.toString()).toBe(played.cube.toString())
-  })
 })
 
 describe('Session Playback controls', () => {

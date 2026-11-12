@@ -56,6 +56,8 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               onSelect={(sticker) => tutor.select(sticker)}
               selectable={isSelectable}
               onRotate={(rotations) => tutor.recordDrag(rotations)}
+              // The Pieces of the Stage Playback is in, until the Cube is solved.
+              highlighted={solved ? undefined : session.teaching?.stage.pieces}
               label="The Cube, seen from the front, top and right"
             />
             <div className="tutor-status">
@@ -75,8 +77,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
             <ScramblePanel
               scramble={session.scramble}
               confirming={state.confirming === 'new-scramble'}
-              // Undone Moves count too: redo could bring them back. So do Moves played from a Solution.
-              movesMade={session.history.length + session.undone.length + session.position}
+              movesMade={session.movesMade}
               onNewScramble={() => tutor.newScramble()}
               onConfirm={() => tutor.confirmNewScramble()}
               onCancel={() => tutor.cancelNewScramble()}
@@ -86,6 +87,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               status={state.solveStatus}
               disabled={waiting}
               onSolve={() => void tutor.solve()}
+              onClose={() => tutor.closeSolution()}
               playback={tutor}
             />
             <TurnControls selected={state.selected} disabled={waiting} onTurn={(direction) => tutor.turn(direction)} />
@@ -94,6 +96,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               moves={session.history}
               canUndo={session.canUndo && !waiting}
               canRedo={session.canRedo && !waiting}
+              stepsSolution={session.playable}
               onUndo={() => tutor.undo()}
               onRedo={() => tutor.redo()}
             />

@@ -1,18 +1,22 @@
 import { useEffect, useRef } from 'react'
 import { formatMove } from '../cube/index.ts'
-import { stageStarts, type Session, type Solution, type SolveStatus } from '../session/index.ts'
+import { stageStarts, type Session, type Solution, type SolveStatus, type Teaching } from '../session/index.ts'
 import { PlaybackControls, type Playback } from './PlaybackControls.tsx'
+import { AlgorithmCards, ReachedMove } from './Teaching.tsx'
 
 /**
  * The Solve button and, once a Solution is loaded, its Stages, each with its
- * Moves in notation, and the Playback controls. Also says when the Cube is
- * already solved, and offers a retry when Solve fails.
+ * goal, its Algorithm cards and its Moves in notation, the Move Playback has
+ * reached with its note, the Playback controls, and a button that closes it.
+ * Also says when the Cube is already solved, offers a retry when Solve fails,
+ * and offers to solve again once a Turn has made the Solution stale.
  */
 export function SolutionPanel({
   session,
   status,
   disabled,
   onSolve,
+  onClose,
   playback,
 }: {
   /** The Session, with its loaded Solution, if any, and where Playback is in it. */
@@ -21,22 +25,32 @@ export function SolutionPanel({
   /** Whether Solve must wait, as it does while the Scramble plays. */
   disabled: boolean
   onSolve: () => void
+  /** Closes the loaded Solution, keeping the Cube as it is. */
+  onClose: () => void
   playback: Playback
 }) {
-  const { solution } = session
+  const { solution, stale } = session
+  const cantSolve = disabled || status === 'solving'
 
   return (
     <section className="panel" aria-labelledby="solution-heading">
       <div className="panel-heading">
         <h2 id="solution-heading">Solution</h2>
-        <button
-          type="button"
-          className="action-button"
-          disabled={disabled || status === 'solving'}
-          onClick={onSolve}
-        >
-          Solve
-        </button>
+        <div className="panel-actions">
+          {solution !== undefined && (
+            <button
+              type="button"
+              className="action-button"
+              title="Close the Solution. Its Moves played stay in the Move history."
+              onClick={onClose}
+            >
+              Close Solution
+            </button>
+          )}
+          <button type="button" className="action-button" disabled={cantSolve} onClick={onSolve}>
+            Solve
+          </button>
+        </div>
       </div>
 
       <p role="status" className="solve-status">
@@ -52,6 +66,15 @@ export function SolutionPanel({
         </div>
       )}
 
+      {stale && (
+        <div className="stale-solution" role="alert">
+          <p>You turned a Layer, so this Solution no longer fits the Cube. Its Moves played are in the Move history.</p>
+          <button type="button" className="action-button" disabled={cantSolve} onClick={onSolve}>
+            Solve again
+          </button>
+        </div>
+      )}
+
       {solution === undefined ? (
         status === 'idle' && <p className="muted">Stuck? Solve shows you the rest of the way, one Stage at a time.</p>
       ) : solution.stages.length === 0 ? (
@@ -61,9 +84,13 @@ export function SolutionPanel({
           <StageList
             solution={solution}
             position={session.position}
+            teaching={session.teaching}
+            stale={stale}
             onJump={(index) => playback.jumpToStage(index)}
           />
-          <PlaybackControls session={session} playback={playback} />
+          {/* A stale Solution is only there to look back on: nothing in it can be played. */}
+          {!stale && <ReachedMove teaching={session.teaching} />}
+          {!stale && <PlaybackControls session={session} playback={playback} />}
         </>
       )}
     </section>
@@ -72,16 +99,22 @@ export function SolutionPanel({
 
 /**
  * The Solution's Stages by name, each a button that jumps to its first
- * Move, with its Moves in notation below. The Move the Cube made last is
- * highlighted, and kept in view as Playback goes.
+ * Move, with its goal, its Algorithm cards and its Moves in notation below.
+ * The Stage Playback is in, the Algorithm being performed and the Move the
+ * Cube made last are highlighted, and kept in view as Playback goes. A stale
+ * Solution's Stages are dimmed, and jump nowhere.
  */
 function StageList({
   solution,
   position,
+  teaching,
+  stale,
   onJump,
 }: {
   solution: Solution
   position: number
+  teaching: Teaching | undefined
+  stale: boolean
   onJump: (index: number) => void
 }) {
   const list = useRef<HTMLOListElement>(null)
@@ -99,20 +132,29 @@ function StageList({
   }, [position])
 
   return (
-    <ol ref={list} className="stage-list" aria-label="Stages">
+    <ol ref={list} className={stale ? 'stage-list stale' : 'stage-list'} aria-label="Stages">
       {solution.stages.map((stage, i) => {
         const start = starts[i] ?? 0
         return (
-          <li key={stage.id}>
-            <button type="button" className="stage-name" title="Jump to this Stage’s first Move" onClick={() => onJump(i)}>
+          <li key={stage.id} aria-current={stage.id === teaching?.stage.id ? 'true' : undefined}>
+            <button
+              type="button"
+              className="stage-name"
+              title="Jump to this Stage’s first Move"
+              disabled={stale}
+              onClick={() => onJump(i)}
+            >
               {stage.name}
             </button>
+            <p className="stage-goal">{stage.goal}</p>
+            <AlgorithmCards stage={stage} teaching={teaching} />
             {stage.moves.length === 0 ? (
               <p className="muted">Already finished.</p>
             ) : (
               <ol className="notation stage-moves" aria-label={`${stage.name} Moves`}>
                 {stage.moves.map(({ move }, j) => (
-                  // A Solution never changes once loaded, so the index is a stable key.
+                  // Each item is only its Move's notation, so the index is a fine key,
+                  // even once a Cube rotation goes into the Stage.
                   <li key={j} aria-current={start + j === position - 1 ? 'step' : undefined}>
                     {formatMove(move)}
                   </li>

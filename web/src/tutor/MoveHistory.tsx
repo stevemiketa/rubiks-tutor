@@ -9,12 +9,15 @@ export function MoveHistory({
   moves,
   canUndo,
   canRedo,
+  stepsSolution,
   onUndo,
   onRedo,
 }: {
   moves: readonly Move[]
   canUndo: boolean
   canRedo: boolean
+  /** Whether undo and redo are Step back and Step forward through a loaded Solution. */
+  stepsSolution: boolean
   onUndo: () => void
   onRedo: () => void
 }) {
@@ -36,7 +39,7 @@ export function MoveHistory({
             className="action-button"
             disabled={!canUndo}
             aria-keyshortcuts="Control+Z Meta+Z"
-            title="Undo (Ctrl+Z or ⌘Z)"
+            title={stepsSolution ? 'Step back through the Solution (Ctrl+Z or ⌘Z)' : 'Undo (Ctrl+Z or ⌘Z)'}
             onClick={onUndo}
           >
             Undo
@@ -46,7 +49,7 @@ export function MoveHistory({
             className="action-button"
             disabled={!canRedo}
             aria-keyshortcuts="Shift+Control+Z Shift+Meta+Z"
-            title="Redo (Shift+Ctrl+Z or Shift+⌘Z)"
+            title={stepsSolution ? 'Step forward through the Solution (Shift+Ctrl+Z or Shift+⌘Z)' : 'Redo (Shift+Ctrl+Z or Shift+⌘Z)'}
             onClick={onRedo}
           >
             Redo

@@ -201,6 +201,79 @@ func TestSolveFlipsWhiteToTheBottomAndPlacesTheMiddleEdgesAsStage3(t *testing.T)
 	}
 }
 
+func TestSolveFinishesTheLastLayerAsStages4To7(t *testing.T) {
+	const scramble = "D2 F' R U2 B L' D R2 F U' L2 B' D' R F2 U L D2 B2 R' U2 F L' B D'"
+	s := solve(t, newTestServer(t), scramble, "")
+	checkSolution(t, scramble, "", s) // which checks that the Solution solves the Cube
+
+	yellowEdges := []string{"yellow-green edge", "yellow-blue edge", "yellow-red edge", "yellow-orange edge"}
+	yellowCorners := []string{"yellow-green-red corner", "yellow-green-orange corner", "yellow-blue-red corner", "yellow-blue-orange corner"}
+	want := []struct {
+		id, name, goal      string
+		pieces              []string
+		algorithm, notation string
+	}{
+		{"yellow-cross", "Yellow cross", "Make a yellow cross on top.", yellowEdges, "Edge flip", "F R U R' U' F'"},
+		{"yellow-face", "Yellow face", "Twist the top corners until the whole top is yellow.", yellowCorners, "Sune", "R U R' U R U2 R'"},
+		{"yellow-corners", "Yellow corners", "Move the top corners to their correct spots.", yellowCorners, "A-perm", "R' F R' B2 R F' R' B2 R2"},
+		{"yellow-edges", "Yellow edges", "Move the top edges to their correct spots to finish the Cube.", yellowEdges, "U-perm", "R U' R U R U R U' R' U' R2"},
+	}
+	if got := stageIDs(s); len(got) != 7 {
+		t.Fatalf("got Stages %v, want all seven", got)
+	}
+	for i, w := range want {
+		st := s.Stages[3+i]
+		if st.ID != w.id || st.Name != w.name || st.Goal != w.goal {
+			t.Errorf("Stage %d is %q %q %q, want %q %q %q", 4+i, st.ID, st.Name, st.Goal, w.id, w.name, w.goal)
+		}
+		if !sameSet(st.Pieces, w.pieces) {
+			t.Errorf("Stage %s Pieces = %v, want %v", st.ID, st.Pieces, w.pieces)
+		}
+		for _, a := range st.Algorithms {
+			if a.Name != w.algorithm || a.Notation != w.notation {
+				t.Errorf("Stage %s uses %q %q, want only %s %s", st.ID, a.Name, a.Notation, w.algorithm, w.notation)
+			}
+		}
+	}
+}
+
+func TestSolveNotesEachTurnOfTheTopInTheYellowStages(t *testing.T) {
+	// Cubes with only the last layer to do: from solved, with white on top,
+	// the yellow layer is turned or worked on from below.
+	for _, history := range []string{
+		"D",                                // only the top to turn, once white is on the bottom
+		"x2 F U R U' R' F' U x2",           // a yellow line from front to back
+		"x2 R U2 R' U' R U' R' U x2",       // Sune's case, turned
+		"x2 U R' F R' B2 R F' R' B2 R2 x2", // three corners moved round, top turned
+	} {
+		t.Run(history, func(t *testing.T) {
+			s := solve(t, newTestServer(t), "", history)
+			checkSolution(t, "", history, s)
+
+			turns := 0
+			for _, st := range s.Stages {
+				notes := map[int]string{}
+				for _, n := range st.Notes {
+					notes[n.At] = n.Text
+				}
+				inAlgorithm := st.inAlgorithm(t)
+				for i, m := range st.moves(t) {
+					if m.Letter != 'U' || inAlgorithm[i] {
+						continue
+					}
+					turns++
+					if !strings.Contains(notes[i], "top") {
+						t.Errorf("Stage %s Move %d (%v) turns the top with note %q, want a note saying what turning the top does", st.ID, i, m, notes[i])
+					}
+				}
+			}
+			if turns == 0 {
+				t.Errorf("the Solution %v turns the top only inside Algorithms; want a Turn to set one up", stageIDs(s))
+			}
+		})
+	}
+}
+
 // errorBody is an API error response body.
 type errorBody struct {
 	Code    string `json:"code"`

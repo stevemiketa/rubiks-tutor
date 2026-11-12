@@ -156,12 +156,11 @@ export class Tutor {
 
   /**
    * Starts a new Session with a fresh Scramble. If Moves were made after the
-   * Scramble, even ones since undone (redo could bring them back), asks the
-   * learner to confirm first: see confirmNewScramble.
+   * Scramble, even ones since undone (redo could bring them back) or played
+   * from a Solution, asks the learner to confirm first: see confirmNewScramble.
    */
   newScramble(): void {
-    const { session } = this.#state
-    if (session.canUndo || session.canRedo) this.#update({ confirming: 'new-scramble' })
+    if (this.#state.session.movesMade > 0) this.#update({ confirming: 'new-scramble' })
     else this.#startNew()
   }
 
@@ -271,22 +270,37 @@ export class Tutor {
 
   /**
    * Undoes the last Move, animating it backward. Does nothing if there is
-   * none, or while the Scramble plays. A loaded Solution is closed first, so
-   * this takes back the last Move played from it.
+   * none, or while the Scramble plays. While a Solution is loaded and not
+   * stale, it is Step back instead.
    */
   undo(): void {
     const { session, scrambling } = this.#state
-    const last = session.closeSolution().history.at(-1)
+    if (session.playable) return this.stepBack()
+    const last = session.history.at(-1)
     if (last === undefined || scrambling) return
     this.#change(session.undo(), inverse(last), { solveStatus: this.#settledSolveStatus() })
   }
 
-  /** Makes the last undone Move again. Does nothing if there is none, or while the Scramble plays. */
+  /**
+   * Makes the last undone Move again. Does nothing if there is none, or while
+   * the Scramble plays. While a Solution is loaded and not stale, it is Step
+   * forward instead.
+   */
   redo(): void {
     const { session, scrambling } = this.#state
+    if (session.playable) return this.stepForward()
     const next = session.undone.at(-1)
-    if (!session.canRedo || next === undefined || scrambling) return
+    if (next === undefined || scrambling) return
     this.#change(session.redo(), next, { solveStatus: this.#settledSolveStatus() })
+  }
+
+  /**
+   * Closes the loaded Solution: the Moves played from it join the Move
+   * history, and the Cube stays as it is, so undo goes back to undoing the
+   * learner's own Moves.
+   */
+  closeSolution(): void {
+    this.#settle(this.#state.session.closeSolution())
   }
 
   /**
@@ -313,7 +327,8 @@ export class Tutor {
     // Nothing else ends a Solve that is waiting, but the Cube may have changed.
     const now = this.#state.session
     if (now.cube.toString() !== asked) this.#update({ solveStatus: 'idle' })
-    else if (result.solved) this.#update({ solveStatus: 'already-solved' })
+    // A stale Solution's Stages have nothing left to show on a solved Cube.
+    else if (result.solved) this.#update({ solveStatus: 'already-solved', session: now.stale ? now.closeSolution() : now })
     else this.#update({ solveStatus: 'idle', session: now.loadSolution(result.solution) })
   }
 
@@ -440,11 +455,12 @@ export class Tutor {
 
   /**
    * The Command a key asks the tutor for now, if any. Space is the tutor's
-   * only while a Solution is loaded; otherwise it stays the browser's.
+   * only while a Solution it can play is loaded, one that isn't stale;
+   * otherwise it stays the browser's.
    */
   commandFor(key: KeyPress): Command | undefined {
     const command = commandForKey(key)
-    if (command?.kind === 'play-pause' && this.#state.session.solution === undefined) return undefined
+    if (command?.kind === 'play-pause' && !this.#state.session.playable) return undefined
     return command
   }
 

@@ -92,8 +92,8 @@ type methodStage struct {
 	algorithms map[string]string
 }
 
-// The Method's Stages in order. Later Stages add themselves here; the
-// property tests check every Stage a Solution contains against this list.
+// The Method's seven Stages in order, from the spec. The property tests
+// check every Stage a Solution contains against this list.
 var method = []methodStage{
 	{
 		id: "white-cross", goal: whiteCrossOnTop, whiteOn: cube.U,
@@ -108,6 +108,26 @@ var method = []methodStage{
 		id: "middle-edges", goal: firstTwoLayersWhiteDown, whiteOn: cube.D,
 		setup:      letterIn("yU"),
 		algorithms: map[string]string{"Right insert": "U R U' R' U' F' U F", "Left insert": "U' L' U L U F U' F'"},
+	},
+	{
+		id: "yellow-cross", goal: yellowCrossOnTop, whiteOn: cube.D,
+		setup:      letterIn("U"),
+		algorithms: map[string]string{"Edge flip": "F R U R' U' F'"},
+	},
+	{
+		id: "yellow-face", goal: yellowFaceOnTop, whiteOn: cube.D,
+		setup:      letterIn("U"),
+		algorithms: map[string]string{"Sune": "R U R' U R U2 R'"},
+	},
+	{
+		id: "yellow-corners", goal: yellowCornersInPlace, whiteOn: cube.D,
+		setup:      letterIn("yU"),
+		algorithms: map[string]string{"A-perm": "R' F R' B2 R F' R' B2 R2"},
+	},
+	{
+		id: "yellow-edges", goal: solvedWhiteDown, whiteOn: cube.D,
+		setup:      letterIn("y"),
+		algorithms: map[string]string{"U-perm": "R U' R U R U R U' R' U' R2"},
 	},
 }
 
@@ -162,6 +182,45 @@ func whiteLayerOnTop(c cube.Cube) bool {
 func firstTwoLayersWhiteDown(c cube.Cube) bool {
 	return c[cube.StickerAt(cube.D, 1, 1)] == cube.White &&
 		piecesMatchCenters(c, func(s cube.Slot) bool { return s.Position[1] <= 0 })
+}
+
+// yellowCrossOnTop reports whether the first two layers are done with white
+// on the bottom, and the four top edges have yellow facing up.
+func yellowCrossOnTop(c cube.Cube) bool {
+	return firstTwoLayersWhiteDown(c) && topYellow(c, func(row, col int) bool { return (row+col)%2 == 1 })
+}
+
+// yellowFaceOnTop reports whether the first two layers are done with white
+// on the bottom, and the whole top face is yellow.
+func yellowFaceOnTop(c cube.Cube) bool {
+	return firstTwoLayersWhiteDown(c) && topYellow(c, func(row, col int) bool { return true })
+}
+
+// yellowCornersInPlace reports whether the whole top face is yellow, over the
+// first two layers with white on the bottom, and every Sticker of the four
+// top corners matches the center of its face.
+func yellowCornersInPlace(c cube.Cube) bool {
+	return yellowFaceOnTop(c) &&
+		piecesMatchCenters(c, func(s cube.Slot) bool { return s.Position[1] == 1 && len(s.Stickers) == 3 })
+}
+
+// solvedWhiteDown reports whether the Cube is solved with white on the
+// bottom.
+func solvedWhiteDown(c cube.Cube) bool {
+	return c[cube.StickerAt(cube.D, 1, 1)] == cube.White && c.IsSolved()
+}
+
+// topYellow reports whether the top face's Stickers that at picks, by row
+// and column, are all yellow.
+func topYellow(c cube.Cube, at func(row, col int) bool) bool {
+	for row := range 3 {
+		for col := range 3 {
+			if at(row, col) && c[cube.StickerAt(cube.U, row, col)] != cube.Yellow {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // piecesMatchCenters reports whether every Sticker of the Pieces in the
