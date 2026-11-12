@@ -93,6 +93,13 @@ a {
   }
 }
 
+/* Fades the 3D Cube between passes. It fills the page, so the Cube sits in it
+   just where it would sit in the page. */
+.splash-cube-fade {
+  position: absolute;
+  inset: 0;
+}
+
 /* The Cube fills as much of the screen as a square can, behind the text. */
 .cube-view.splash-cube {
   position: absolute;
