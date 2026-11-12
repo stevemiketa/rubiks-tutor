@@ -96,8 +96,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
               moves={session.history}
               canUndo={session.canUndo && !waiting}
               canRedo={session.canRedo && !waiting}
-              // While a Solution is loaded, and not stale, undo and redo step through it.
-              stepsSolution={session.solution !== undefined && !session.stale}
+              stepsSolution={session.playable}
               onUndo={() => tutor.undo()}
               onRedo={() => tutor.redo()}
             />

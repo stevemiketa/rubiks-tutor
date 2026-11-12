@@ -50,7 +50,7 @@ export function stageStarts(solution: Solution): readonly number[] {
 }
 
 /** The note on a Cube rotation the learner made during Playback. */
-export const ROTATION_NOTE = 'you rotated the Cube here; the Moves after it are relabeled to match'
+const ROTATION_NOTE = 'you rotated the Cube here; the Moves after it are relabeled to match'
 
 /**
  * The Solution with a Cube rotation the learner made put in at a position,

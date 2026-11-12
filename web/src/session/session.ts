@@ -220,7 +220,7 @@ export class Session {
    * back past the Scramble.
    */
   get canUndo(): boolean {
-    return this.#playable === undefined ? this.history.length > 0 : this.previousMove !== undefined
+    return this.#fresh === undefined ? this.history.length > 0 : this.previousMove !== undefined
   }
 
   /**
@@ -228,7 +228,7 @@ export class Session {
    * loaded and not stale, one left to play from it.
    */
   get canRedo(): boolean {
-    return this.#playable === undefined ? this.undone.length > 0 : this.nextMove !== undefined
+    return this.#fresh === undefined ? this.undone.length > 0 : this.nextMove !== undefined
   }
 
   /**
@@ -270,6 +270,14 @@ export class Session {
     return this.#fields.solution?.stale ?? false
   }
 
+  /**
+   * Whether a Solution Playback can play is loaded: one that isn't stale.
+   * Undo and redo then step back and forward through it.
+   */
+  get playable(): boolean {
+    return this.#fresh !== undefined
+  }
+
   /** Whether Playback pauses by itself at the end of each Stage. On unless the learner turns it off. */
   get autoPause(): boolean {
     return this.#fields.solution?.autoPause ?? true
@@ -277,13 +285,13 @@ export class Session {
 
   /** The loaded Solution's next Move to play, if there is one. A stale Solution has none. */
   get nextMove(): Move | undefined {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     return loaded?.solution.moves[loaded.position]
   }
 
   /** The last Move played from the loaded Solution: the one Step back takes back. A stale Solution has none. */
   get previousMove(): Move | undefined {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     return loaded === undefined || loaded.position === 0 ? undefined : loaded.solution.moves[loaded.position - 1]
   }
 
@@ -293,7 +301,7 @@ export class Session {
    * Undefined with no Solution loaded, a stale one, or one with no Stages.
    */
   get teaching(): Teaching | undefined {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     return loaded && teachingAt(loaded.solution, loaded.position)
   }
 
@@ -314,7 +322,7 @@ export class Session {
    *   Move history first, then the Turn.
    */
   move(move: Move): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     const cube = this.cube.apply([move])
     if (loaded !== undefined && !isRotation(move)) {
       const s = this.closeSolution()
@@ -335,7 +343,7 @@ export class Session {
    * While a Solution is loaded and not stale, undo is Step back.
    */
   undo(): Session {
-    if (this.#playable !== undefined) return this.stepBack()
+    if (this.#fresh !== undefined) return this.stepBack()
     const last = this.history.at(-1)
     if (last === undefined) return this
     return this.#with({ history: this.history.slice(0, -1), undone: [...this.undone, last] }, this.cube.apply([inverse(last)]))
@@ -347,7 +355,7 @@ export class Session {
    * forward.
    */
   redo(): Session {
-    if (this.#playable !== undefined) return this.stepForward()
+    if (this.#fresh !== undefined) return this.stepForward()
     const next = this.undone.at(-1)
     if (next === undefined) return this
     return this.#with({ history: [...this.history, next], undone: this.undone.slice(0, -1) }, this.cube.apply([next]))
@@ -367,7 +375,7 @@ export class Session {
 
   /** Starts Playback forward from the current position. Does nothing with no Move left to play, or a stale Solution. */
   play(): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined || loaded.direction === 'forward' || this.nextMove === undefined) return this
     return this.#with({ solution: { ...loaded, direction: 'forward' } })
   }
@@ -377,7 +385,7 @@ export class Session {
    * it was before Solve. Does nothing at the start.
    */
   reverse(): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined || loaded.direction === 'backward' || this.previousMove === undefined) return this
     return this.#with({ solution: { ...loaded, direction: 'backward' } })
   }
@@ -398,7 +406,7 @@ export class Session {
    * Session while paused.
    */
   playNext(): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded?.direction === undefined) return this
     const { solution } = loaded
     const position = loaded.position + (loaded.direction === 'forward' ? 1 : -1)
@@ -415,7 +423,7 @@ export class Session {
    * with no Solution loaded, or a stale one.
    */
   seek(position: number): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined) return this
     if (!Number.isInteger(position) || position < 0 || position > loaded.solution.moves.length) {
       throw new RangeError(`position ${position} isn't in a Solution of ${loaded.solution.moves.length} Moves`)
@@ -429,7 +437,7 @@ export class Session {
    * doesn't have. Returns this Session with no Solution loaded, or a stale one.
    */
   jumpToStage(index: number): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined) return this
     const start = stageStarts(loaded.solution)[index]
     if (start === undefined) throw new RangeError(`the Solution has no Stage ${index}`)
@@ -455,7 +463,7 @@ export class Session {
    * Returns this Session if there is none.
    */
   stepForward(): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined || this.nextMove === undefined) return this
     return this.#at(loaded, loaded.position + 1, undefined)
   }
@@ -465,7 +473,7 @@ export class Session {
    * loaded Solution. Returns this Session if none has been played.
    */
   stepBack(): Session {
-    const loaded = this.#playable
+    const loaded = this.#fresh
     if (loaded === undefined || this.previousMove === undefined) return this
     return this.#at(loaded, loaded.position - 1, undefined)
   }
@@ -495,7 +503,7 @@ export class Session {
   }
 
   // The loaded Solution, if Playback can play it: it isn't stale.
-  get #playable(): LoadedSolution | undefined {
+  get #fresh(): LoadedSolution | undefined {
     const loaded = this.#fields.solution
     return loaded?.stale ? undefined : loaded
   }

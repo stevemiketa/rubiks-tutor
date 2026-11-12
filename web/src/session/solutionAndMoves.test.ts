@@ -31,7 +31,7 @@ function steps(session: Session, n: number): Session {
 }
 
 // Recorded from the Go solver (POST /api/solve) for Scramble "R D R F R2 U'"
-// and no Moves. Its three Stages solve this Cube completely.
+// and no Moves. Its first three Stages solve this Cube completely.
 const recordedScramble = "R D R F R2 U'"
 const recorded = solutionOf({
   solved: false,
@@ -74,6 +74,43 @@ const recorded = solutionOf({
       algorithms: [{ name: 'Left insert', notation: "U' L' U L U F U' F'", start: 2, length: 8 }],
       pieces: ['green-red edge', 'green-orange edge', 'blue-red edge', 'blue-orange edge'],
     },
+    // The middle layer finishes this Cube, so the yellow Stages have no Moves.
+    {
+      id: 'yellow-cross',
+      name: 'Yellow cross',
+      goal: 'Make a yellow cross on top.',
+      moves: '',
+      notes: [],
+      algorithms: [],
+      pieces: ['yellow-green edge', 'yellow-red edge', 'yellow-blue edge', 'yellow-orange edge'],
+    },
+    {
+      id: 'yellow-face',
+      name: 'Yellow face',
+      goal: 'Twist the top corners until the whole top is yellow.',
+      moves: '',
+      notes: [],
+      algorithms: [],
+      pieces: ['yellow-green-red corner', 'yellow-green-orange corner', 'yellow-blue-red corner', 'yellow-blue-orange corner'],
+    },
+    {
+      id: 'yellow-corners',
+      name: 'Yellow corners',
+      goal: 'Move the top corners to their correct spots.',
+      moves: '',
+      notes: [],
+      algorithms: [],
+      pieces: ['yellow-green-red corner', 'yellow-green-orange corner', 'yellow-blue-red corner', 'yellow-blue-orange corner'],
+    },
+    {
+      id: 'yellow-edges',
+      name: 'Yellow edges',
+      goal: 'Move the top edges to their correct spots to finish the Cube.',
+      moves: '',
+      notes: [],
+      algorithms: [],
+      pieces: ['yellow-green edge', 'yellow-red edge', 'yellow-blue edge', 'yellow-orange edge'],
+    },
   ],
 })
 
@@ -93,7 +130,9 @@ describe('a manual Turn while a Solution is loaded', () => {
     expect(turned.cube.toString()).toBe(cubeOf(`${recordedScramble} M U R2 F' F`))
     expect(turned.stale).toBe(true)
     expect(turned.solution).toBe(recorded)
+    expect(turned.playable).toBe(false)
     expect(played.stale).toBe(false)
+    expect(played.playable).toBe(true)
   })
 
   it('makes the Solution stale even before any of it is played', () => {
@@ -213,8 +252,16 @@ describe('a Cube rotation while a Solution is loaded', () => {
 
     // y brings the right Layer to the front and the left to the back, and x
     // now turns as z did.
-    expect(stageMoves(rotated)).toEqual(["U R2 F' R2 y", "y D' F' D' F D", "z2 y2 U' B' U B U L U' L'"])
-    expect(algorithms(rotated)).toEqual([[], ["Corner trigger: F' D' F D @ 2"], ["Left insert: U' B' U B U L U' L' @ 2"]])
+    expect(stageMoves(rotated)).toEqual(["U R2 F' R2 y", "y D' F' D' F D", "z2 y2 U' B' U B U L U' L'", '', '', '', ''])
+    expect(algorithms(rotated)).toEqual([
+      [],
+      ["Corner trigger: F' D' F D @ 2"],
+      ["Left insert: U' B' U B U L U' L' @ 2"],
+      [],
+      [],
+      [],
+      [],
+    ])
     expect(rotated.position).toBe(5)
     expect(rotated.history).toEqual([])
     expect(rotated.stale).toBe(false)
@@ -226,8 +273,16 @@ describe('a Cube rotation while a Solution is loaded', () => {
     // Three Moves into Stage 2, inside the Corner trigger.
     const rotated = steps(loaded(), 7).move(move("y'"))
 
-    expect(stageMoves(rotated)).toEqual(["U R2 F' R2", "y D' R' y' D' B D", "z2 y2 U' F' U F U R U' R'"])
-    expect(algorithms(rotated)).toEqual([[], ["Corner trigger: R' y' D' B D @ 2"], ["Left insert: U' F' U F U R U' R' @ 2"]])
+    expect(stageMoves(rotated)).toEqual(["U R2 F' R2", "y D' R' y' D' B D", "z2 y2 U' F' U F U R U' R'", '', '', '', ''])
+    expect(algorithms(rotated)).toEqual([
+      [],
+      ["Corner trigger: R' y' D' B D @ 2"],
+      ["Left insert: U' F' U F U R U' R' @ 2"],
+      [],
+      [],
+      [],
+      [],
+    ])
     for (const stage of rotated.solution?.stages ?? []) {
       for (const use of stage.algorithms) {
         const there = stage.moves.slice(use.start, use.start + use.moves.length).map((m) => m.move)

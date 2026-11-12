@@ -275,7 +275,7 @@ export class Tutor {
    */
   undo(): void {
     const { session, scrambling } = this.#state
-    if (stepsThrough(session)) return this.stepBack()
+    if (session.playable) return this.stepBack()
     const last = session.history.at(-1)
     if (last === undefined || scrambling) return
     this.#change(session.undo(), inverse(last), { solveStatus: this.#settledSolveStatus() })
@@ -288,7 +288,7 @@ export class Tutor {
    */
   redo(): void {
     const { session, scrambling } = this.#state
-    if (stepsThrough(session)) return this.stepForward()
+    if (session.playable) return this.stepForward()
     const next = session.undone.at(-1)
     if (next === undefined || scrambling) return
     this.#change(session.redo(), next, { solveStatus: this.#settledSolveStatus() })
@@ -460,7 +460,7 @@ export class Tutor {
    */
   commandFor(key: KeyPress): Command | undefined {
     const command = commandForKey(key)
-    if (command?.kind === 'play-pause' && !stepsThrough(this.#state.session)) return undefined
+    if (command?.kind === 'play-pause' && !this.#state.session.playable) return undefined
     return command
   }
 
@@ -563,12 +563,6 @@ export class Tutor {
     }
     for (const listener of this.#listeners) listener()
   }
-}
-
-// Whether undo and redo step through the loaded Solution: one is loaded, and
-// it isn't stale.
-function stepsThrough(session: Session): boolean {
-  return session.solution !== undefined && !session.stale
 }
 
 function sameSnapshot(a: Session, b: Session): boolean {
