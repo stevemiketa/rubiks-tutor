@@ -411,8 +411,31 @@ a {
 
 .tutor-tools {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+}
+
+/* The Theme control: a label and a native select, styled as the buttons
+   beside it are. */
+.theme-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.theme-control select {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border-control);
+  border-radius: 0.5rem;
+  background: var(--color-control);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.theme-control select:hover {
+  background: var(--color-control-hover);
 }
 
 .cube-view.draggable canvas {
