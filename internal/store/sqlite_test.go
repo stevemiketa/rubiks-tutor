@@ -60,7 +60,14 @@ func TestSQLiteSnapshotsOutliveTheProcessThatSavedThem(t *testing.T) {
 }
 
 func TestSQLiteStoresStartingTogetherShareOneDatabase(t *testing.T) {
-	url := "sqlite:" + filepath.Join(t.TempDir(), "cubular.db")
+	startTogether(t, "sqlite:"+filepath.Join(t.TempDir(), "cubular.db"))
+}
+
+// startTogether opens several stores on one new database at once, as
+// replicas starting together do, and checks that they all migrate it and
+// then share it.
+func startTogether(t *testing.T, url string) {
+	t.Helper()
 	const n = 6
 	stores := make([]*store.Store, n)
 	errs := make([]error, n)

@@ -5,9 +5,10 @@
 //
 //	PORT                  the TCP port to listen on (default 8080; 0 picks a
 //	                      free port)
-//	DATABASE_URL          where Snapshots are stored (default
-//	                      sqlite:cubular.db, a SQLite file in the working
-//	                      directory); see store.Open
+//	DATABASE_URL          where Snapshots are stored: a SQLite file
+//	                      (default sqlite:cubular.db, in the working
+//	                      directory) or a postgres:// URL; see store.Open.
+//	                      GET /readyz checks it
 //	PUBLIC_BASE_URL       where share links point, such as
 //	                      https://cubular.example (default: the address
 //	                      each request was sent to)
@@ -85,6 +86,7 @@ func run(ctx context.Context, logger *slog.Logger, getenv func(string) string) e
 		}
 	}()
 	cfg.Snapshots = snapshots
+	cfg.Ready = snapshots.Ping
 
 	ln, err := net.Listen("tcp", ":"+port)
 	if err != nil {

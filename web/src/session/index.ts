@@ -16,9 +16,10 @@ export {
 export { snapRotations, type Orientation } from './drag.ts'
 export { MoveQueue, QUARTER_TURN_MS, moveDuration, type QueuedMove } from './moveQueue.ts'
 export { generateScramble } from './scramble.ts'
-export { Session, type SavedSession, type Snapshot } from './session.ts'
+export { PLAYBACK_SPEEDS, Session, type PlaybackSpeed, type SavedSession, type Snapshot } from './session.ts'
 export {
   parseSolveResponse,
+  stageStarts,
   type AlgorithmUse,
   type Solution,
   type SolutionMove,

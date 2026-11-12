@@ -2,8 +2,8 @@
 // any, with the position Playback has reached in it. It is the state that is
 // saved and shared; what is on screen right now (the selection, a hint, the
 // animation in progress) lives in Tutor.
-import { Cube, formatMoves, inverse, parseMoves, type Move } from '../cube/index.ts'
-import type { Solution } from './solution.ts'
+import { Cube, formatMoves, inverse, invert, parseMoves, type Move } from '../cube/index.ts'
+import { stageStarts, type Solution } from './solution.ts'
 
 // Everything a Session holds, as plain data. Add new parts of a Session here,
 // give them a starting value in Session.start and a codec in CODECS, and
@@ -20,13 +20,31 @@ interface Fields {
   readonly solution: LoadedSolution | undefined
 }
 
+/**
+ * Which way Playback plays: forward toward solved, or backward toward the
+ * Cube as it was before Solve.
+ */
+type PlaybackDirection = 'forward' | 'backward'
+
+/** How fast Playback animates each Move: 1 is normal, 2 twice as fast. */
+export type PlaybackSpeed = 0.5 | 1 | 2 | 4
+
+/** The speeds the learner can pick from, slowest first. */
+export const PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [0.5, 1, 2, 4]
+
 /** A Solution loaded into a Session. Playback is a position in it, not a timer. */
 interface LoadedSolution {
   readonly solution: Solution
   /** How many of the Solution's Moves have been played: the Cube shows them. */
   readonly position: number
-  /** Whether Playback goes on to the next Move once the current one has been shown. */
-  readonly playing: boolean
+  /**
+   * Which way Playback goes on once the scene has shown the current Move, or
+   * undefined while it is paused.
+   */
+  readonly direction: PlaybackDirection | undefined
+  readonly speed: PlaybackSpeed
+  /** Whether Playback pauses by itself at the end of each Stage. */
+  readonly autoPause: boolean
 }
 
 /**
@@ -185,15 +203,36 @@ export class Session {
     return this.#fields.solution?.position ?? 0
   }
 
-  /** Whether Playback is playing the loaded Solution, rather than paused. */
+  /** Whether Playback is playing the loaded Solution forward. */
   get playing(): boolean {
-    return this.#fields.solution?.playing ?? false
+    return this.#fields.solution?.direction === 'forward'
+  }
+
+  /** Whether Playback is playing the loaded Solution backward. */
+  get reversing(): boolean {
+    return this.#fields.solution?.direction === 'backward'
+  }
+
+  /** How fast Playback animates each Move. 1× unless the learner picks another speed. */
+  get speed(): PlaybackSpeed {
+    return this.#fields.solution?.speed ?? 1
+  }
+
+  /** Whether Playback pauses by itself at the end of each Stage. On unless the learner turns it off. */
+  get autoPause(): boolean {
+    return this.#fields.solution?.autoPause ?? true
   }
 
   /** The loaded Solution's next Move to play, if there is one. */
   get nextMove(): Move | undefined {
     const loaded = this.#fields.solution
     return loaded?.solution.moves[loaded.position]
+  }
+
+  /** The last Move played from the loaded Solution: the one Step back takes back. */
+  get previousMove(): Move | undefined {
+    const loaded = this.#fields.solution
+    return loaded === undefined || loaded.position === 0 ? undefined : loaded.solution.moves[loaded.position - 1]
   }
 
   /** Whether the Cube is solved: every face a single color, in any orientation. */
@@ -230,36 +269,119 @@ export class Session {
     return s.#with({ history: [...s.history, next], undone: s.undone.slice(0, -1) }, s.cube.apply([next]))
   }
 
-  /** The Session with a Solution loaded at its start, paused. A Solution already loaded is closed first. */
+  /**
+   * The Session with a Solution loaded at its start, paused. A Solution
+   * already loaded is closed first, and the new one keeps its speed and
+   * auto-pause setting.
+   */
   loadSolution(solution: Solution): Session {
-    return this.closeSolution().#with({ solution: { solution, position: 0, playing: false } })
+    const { speed, autoPause } = this
+    return this.closeSolution().#with({ solution: { solution, position: 0, direction: undefined, speed, autoPause } })
   }
 
-  /** Starts Playback from the current position. Does nothing with no Move left to play. */
+  /** Starts Playback forward from the current position. Does nothing with no Move left to play. */
   play(): Session {
     const loaded = this.#fields.solution
-    if (loaded === undefined || loaded.playing || this.nextMove === undefined) return this
-    return this.#with({ solution: { ...loaded, playing: true } })
+    if (loaded === undefined || loaded.direction === 'forward' || this.nextMove === undefined) return this
+    return this.#with({ solution: { ...loaded, direction: 'forward' } })
+  }
+
+  /**
+   * Starts Playback backward from the current position, toward the Cube as
+   * it was before Solve. Does nothing at the start.
+   */
+  reverse(): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined || loaded.direction === 'backward' || this.previousMove === undefined) return this
+    return this.#with({ solution: { ...loaded, direction: 'backward' } })
   }
 
   /** Pauses Playback on the current position. */
   pause(): Session {
     const loaded = this.#fields.solution
-    if (loaded === undefined || !loaded.playing) return this
-    return this.#with({ solution: { ...loaded, playing: false } })
+    if (loaded === undefined || loaded.direction === undefined) return this
+    return this.#with({ solution: { ...loaded, direction: undefined } })
   }
 
   /**
-   * Plays the loaded Solution's next Move, or returns this Session if there
-   * is none. Playback stops by itself once the last Move is played.
+   * Plays Playback's next Move, the way it is going: forward, or backward by
+   * taking back the last Move played. The scene calls for it once it has
+   * shown the Move before. Playback pauses by itself at the end of the
+   * Solution and back at its start, and, with auto-pause on, wherever one
+   * Stage ends and the next starts, whichever way it is going. Returns this
+   * Session while paused.
+   */
+  playNext(): Session {
+    const loaded = this.#fields.solution
+    if (loaded?.direction === undefined) return this
+    const { solution } = loaded
+    const position = loaded.position + (loaded.direction === 'forward' ? 1 : -1)
+    if (position < 0 || position > solution.moves.length) return this
+    const stops =
+      position === 0 || position === solution.moves.length || (loaded.autoPause && stageStarts(solution).includes(position))
+    return this.#at(loaded, position, stops ? undefined : loaded.direction)
+  }
+
+  /**
+   * Scrubs to a position in the loaded Solution: the Cube shows its Moves up
+   * to there, and Playback pauses. Throws a RangeError for a position that
+   * isn't in the Solution (0 to its number of Moves). Returns this Session
+   * with no Solution loaded.
+   */
+  seek(position: number): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined) return this
+    if (!Number.isInteger(position) || position < 0 || position > loaded.solution.moves.length) {
+      throw new RangeError(`position ${position} isn't in a Solution of ${loaded.solution.moves.length} Moves`)
+    }
+    return this.#at(loaded, position, undefined)
+  }
+
+  /**
+   * Jumps to the first Move of one of the loaded Solution's Stages, by its
+   * index in Stage order, and pauses. Throws a RangeError for a Stage it
+   * doesn't have. Returns this Session with no Solution loaded.
+   */
+  jumpToStage(index: number): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined) return this
+    const start = stageStarts(loaded.solution)[index]
+    if (start === undefined) throw new RangeError(`the Solution has no Stage ${index}`)
+    return this.#at(loaded, start, undefined)
+  }
+
+  /** Changes how fast Playback animates each Move. Does nothing with no Solution loaded. */
+  setSpeed(speed: PlaybackSpeed): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined || loaded.speed === speed) return this
+    return this.#with({ solution: { ...loaded, speed } })
+  }
+
+  /** Turns auto-pause at the end of each Stage on or off. Does nothing with no Solution loaded. */
+  setAutoPause(on: boolean): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined || loaded.autoPause === on) return this
+    return this.#with({ solution: { ...loaded, autoPause: on } })
+  }
+
+  /**
+   * Step forward: pauses Playback and plays the loaded Solution's next Move.
+   * Returns this Session if there is none.
    */
   stepForward(): Session {
     const loaded = this.#fields.solution
-    const move = this.nextMove
-    if (loaded === undefined || move === undefined) return this
-    const position = loaded.position + 1
-    const playing = loaded.playing && position < loaded.solution.moves.length
-    return this.#with({ solution: { ...loaded, position, playing } }, this.cube.apply([move]))
+    if (loaded === undefined || this.nextMove === undefined) return this
+    return this.#at(loaded, loaded.position + 1, undefined)
+  }
+
+  /**
+   * Step back: pauses Playback and takes back the last Move played from the
+   * loaded Solution. Returns this Session if none has been played.
+   */
+  stepBack(): Session {
+    const loaded = this.#fields.solution
+    if (loaded === undefined || this.previousMove === undefined) return this
+    return this.#at(loaded, loaded.position - 1, undefined)
   }
 
   /**
@@ -272,6 +394,18 @@ export class Session {
     const played = loaded.solution.moves.slice(0, loaded.position)
     if (played.length === 0) return this.#with({ solution: undefined })
     return this.#with({ solution: undefined, history: [...this.history, ...played], undone: [] })
+  }
+
+  // The Session with Playback at another position in the loaded Solution,
+  // going the given way. The Cube plays or takes back the Moves in between.
+  #at(loaded: LoadedSolution, position: number, direction: PlaybackDirection | undefined): Session {
+    if (position === loaded.position && direction === loaded.direction) return this
+    const { moves } = loaded.solution
+    const cube =
+      position >= loaded.position
+        ? this.cube.apply(moves.slice(loaded.position, position))
+        : this.cube.apply(invert(moves.slice(position, loaded.position)))
+    return this.#with({ solution: { ...loaded, position, direction } }, cube)
   }
 
   #with(changes: Partial<Fields>, cube: Cube = this.cube): Session {

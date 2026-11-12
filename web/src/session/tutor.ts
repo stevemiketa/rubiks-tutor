@@ -16,9 +16,9 @@ import {
   type KeyPress,
   type RotationDirection,
 } from './controls.ts'
-import { MoveQueue } from './moveQueue.ts'
+import { MoveQueue, moveDuration } from './moveQueue.ts'
 import { generateScramble } from './scramble.ts'
-import { Session } from './session.ts'
+import { Session, type PlaybackSpeed } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
 import { snapshotApi } from './snapshotClient.ts'
@@ -329,10 +329,75 @@ export class Tutor {
     if (this.queue.isIdle) this.#playNext()
   }
 
+  /**
+   * Plays the loaded Solution backward from the current position, toward the
+   * Cube as it was before Solve, taking back one Move at a time the way play
+   * plays them.
+   */
+  reverse(): void {
+    const { session } = this.#state
+    const reversing = session.reverse()
+    if (reversing === session) return
+    this.#update({ session: reversing })
+    if (this.queue.isIdle) this.#playNext()
+  }
+
+  /** Pauses Playback if it is playing either way, and otherwise plays it forward: what Space does. */
+  playOrPause(): void {
+    const { session } = this.#state
+    if (session.playing || session.reversing) this.pause()
+    else this.play()
+  }
+
   /** Pauses Playback. The Move animating now finishes, and no other is queued. */
   pause(): void {
+    this.#settle(this.#state.session.pause())
+  }
+
+  /**
+   * Step forward: plays the loaded Solution's next Move and pauses Playback.
+   * The Move animates after any still animating, at the Playback speed.
+   */
+  stepForward(): void {
     const { session } = this.#state
-    if (session.playing) this.#update({ session: session.pause() })
+    const move = session.nextMove
+    if (move === undefined) return
+    this.#playback(session.stepForward(), move)
+  }
+
+  /**
+   * Step back: takes back the last Move played from the loaded Solution,
+   * animating it backward, and pauses Playback.
+   */
+  stepBack(): void {
+    const { session } = this.#state
+    const last = session.previousMove
+    if (last === undefined) return
+    this.#playback(session.stepBack(), inverse(last))
+  }
+
+  /**
+   * Scrubs to a position in the loaded Solution and pauses Playback. The
+   * Cube shows it at once, without animating the Moves in between. Throws a
+   * RangeError for a position that isn't in the Solution.
+   */
+  seek(position: number): void {
+    this.#jump(this.#state.session.seek(position))
+  }
+
+  /** Jumps to the first Move of a Stage, by its index in Stage order, the way seek does. */
+  jumpToStage(index: number): void {
+    this.#jump(this.#state.session.jumpToStage(index))
+  }
+
+  /** Changes how fast the Solution's Moves animate, from the next one queued on. */
+  setSpeed(speed: PlaybackSpeed): void {
+    this.#settle(this.#state.session.setSpeed(speed))
+  }
+
+  /** Turns auto-pause at the end of each Stage on or off. */
+  setAutoPause(on: boolean): void {
+    this.#settle(this.#state.session.setAutoPause(on))
   }
 
   /** Does what a Command asks. */
@@ -356,6 +421,9 @@ export class Tutor {
       case 'redo':
         this.redo()
         return
+      case 'play-pause':
+        this.playOrPause()
+        return
     }
   }
 
@@ -364,10 +432,20 @@ export class Tutor {
    * which case the caller should stop the browser's default action.
    */
   press(key: KeyPress): boolean {
-    const command = commandForKey(key)
+    const command = this.commandFor(key)
     if (command === undefined) return false
     this.run(command)
     return true
+  }
+
+  /**
+   * The Command a key asks the tutor for now, if any. Space is the tutor's
+   * only while a Solution is loaded; otherwise it stays the browser's.
+   */
+  commandFor(key: KeyPress): Command | undefined {
+    const command = commandForKey(key)
+    if (command?.kind === 'play-pause' && this.#state.session.solution === undefined) return undefined
+    return command
   }
 
   // Every new Move the learner makes goes through here. Moves wait for the
@@ -377,12 +455,35 @@ export class Tutor {
     this.#change(this.#state.session.move(move), move, { solveStatus: this.#settledSolveStatus() }, durationMs)
   }
 
-  // Plays the loaded Solution's next Move, if Playback is playing.
+  // Plays Playback's next Move, if it is playing either way: the next Move
+  // forward, or the last Move played taken back.
   #playNext(): void {
     const { session } = this.#state
-    const move = session.nextMove
-    if (!session.playing || move === undefined) return
-    this.#change(session.stepForward(), move)
+    const last = session.previousMove
+    const move = session.playing ? session.nextMove : session.reversing && last !== undefined ? inverse(last) : undefined
+    if (move === undefined) return
+    this.#playback(session.playNext(), move)
+  }
+
+  // Takes a Session that shows the same Cube, such as one with Playback
+  // paused or at another speed, if it changed.
+  #settle(session: Session): void {
+    if (session !== this.#state.session) this.#update({ session })
+  }
+
+  // Shows a Session at once, dropping whatever the queue still had to
+  // animate: its Cube is where those Moves were going anyway. The Session
+  // changes first, so the queue's listeners see it.
+  #jump(session: Session): void {
+    if (session === this.#state.session) return
+    this.#update({ session })
+    this.queue.jump(session.cube)
+  }
+
+  // Shows one of the Solution's Moves, played forward or taken back, at the
+  // Playback speed.
+  #playback(session: Session, move: Move): void {
+    this.#change(session, move, {}, moveDuration(move, session.speed))
   }
 
   // Every Move the Session makes goes through here, so the Session and what

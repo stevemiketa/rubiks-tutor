@@ -1,8 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { solutionPanel, stages } from './tutor.ts'
-
-// How far Playback has got, as the Solution panel shows it.
-const progress = (page: Page) => solutionPanel(page).getByText(/^\d+ of \d+ Moves played$/)
+import { progress, solutionPanel, stages } from './tutor.ts'
 
 // The indicator the tutor shows while the Cube is solved.
 const solvedIndicator = (page: Page) => page.getByRole('status').getByText('Solved', { exact: true })
@@ -61,6 +58,9 @@ test.describe('with reduced motion', () => {
     expect(await movesPlayed(page)).toEqual(paused)
     expect(paused.played).toBeLessThan(total)
 
+    // Straight on to the end, without pausing between Stages, at 4×.
+    await panel.getByRole('switch', { name: 'Pause at the end of each Stage' }).click()
+    await panel.getByRole('button', { name: '4×', exact: true }).click()
     await panel.getByRole('button', { name: 'Play' }).click()
 
     await expect(progress(page)).toHaveText(`${total} of ${total} Moves played`, { timeout: total * 400 + 5000 })
