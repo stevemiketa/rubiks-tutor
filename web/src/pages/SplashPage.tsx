@@ -1,9 +1,8 @@
 import { MotionConfig, motion } from 'motion/react'
-import { useState } from 'react'
 import { Link } from '../routing/Link.tsx'
+import { CubePicture } from '../scene/CubePicture.tsx'
 import { CubeView } from '../scene/CubeView.tsx'
 import { usePrefersReducedMotion } from '../scene/usePrefersReducedMotion.ts'
-import { MoveQueue } from '../session/index.ts'
 import { SPLASH_STILL } from '../splash/recording.ts'
 import { useSplashLoop } from '../splash/useSplashLoop.ts'
 
@@ -55,11 +54,11 @@ function LoopingCube() {
   return <CubeView queue={queue} label="The Cube scrambling and then solving itself" className="splash-cube" />
 }
 
+// A picture rather than a 3D view, so it needs no WebGL.
 function StillCube() {
-  const [queue] = useState(() => new MoveQueue(SPLASH_STILL))
   return (
-    <CubeView
-      queue={queue}
+    <CubePicture
+      cube={SPLASH_STILL}
       label="The Cube partway through being solved, with its white layer finished"
       className="splash-cube"
     />

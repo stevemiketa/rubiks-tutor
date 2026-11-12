@@ -205,6 +205,13 @@ a {
   margin: 0 auto;
 }
 
+/* The still picture fills the same square the 3D view would. */
+.cube-picture svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .tutor-status {
   position: absolute;
   inset: 0 0 auto 0;

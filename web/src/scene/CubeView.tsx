@@ -7,11 +7,9 @@ import * as THREE from 'three'
 import { moveAxis, type Move, type Sticker } from '../cube/index.ts'
 import { QUARTER_TURN_MS, snapRotations, type MoveQueue, type QueuedMove } from '../session/index.ts'
 import { CubeModel } from './cubeModel.ts'
+import { CAMERA } from './look.ts'
 import { prefersReducedMotion } from './usePrefersReducedMotion.ts'
 import { NoWebGL, WebGLGate } from './webgl.tsx'
-
-/** Where the fixed camera sits, looking at the Cube's center. */
-const CAMERA = { position: [5, 4.6, 7.6] as const, fov: 37 }
 
 export interface CubeViewProps {
   /** What to show and animate. */
