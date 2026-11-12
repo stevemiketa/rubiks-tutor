@@ -1,6 +1,7 @@
 // Package store keeps Snapshots in a SQL database (ADR 0004). DATABASE_URL
 // picks the database: a SQLite file by default, so a local run needs no
-// outside services.
+// outside services, or Postgres in production, which several replicas can
+// share.
 //
 // Each database has a dialect (dialect.go) and its own migrations, in
 // migrations/<dialect name>, which Open applies. Every dialect runs the same
@@ -13,7 +14,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stevemiketa/rubiks-tutor/internal/snapshot"
 )
@@ -37,6 +40,12 @@ type Store struct {
 //	                to the working directory unless it starts with /, as in
 //	                sqlite:///var/lib/cubular/cubular.db (sqlite://<path>
 //	                is the same as sqlite:<path>)
+//	postgres://...  a Postgres database, in any URL form the pgx driver
+//	                accepts, such as
+//	                postgres://user:password@host:5432/database?sslmode=require
+//	                (postgresql:// is the same)
+//
+// Processes opening one database at once take turns migrating it.
 func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	d, dsn, err := parseURL(databaseURL)
 	if err != nil {
@@ -45,6 +54,10 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 	db, err := sql.Open(d.driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening the %s database: %w", d.name, err)
+	}
+	if err := d.prepare(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("preparing the %s database: %w", d.name, err)
 	}
 	if err := migrate(ctx, db, d); err != nil {
 		_ = db.Close()
@@ -55,6 +68,9 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
+
+// Ping checks that the database answers. It fails once the Store is closed.
+func (s *Store) Ping(ctx context.Context) error { return s.db.PingContext(ctx) }
 
 // Save stores a Snapshot under the first of its IDs that is free or already
 // holds it, and returns that ID.
@@ -94,6 +110,11 @@ func (s *Store) insert(ctx context.Context, id string, body []byte) ([]byte, err
 
 // Load returns the Snapshot stored under id.
 func (s *Store) Load(ctx context.Context, id string) (snapshot.Saved, error) {
+	// No ID holds a byte that isn't UTF-8 or is NUL, and Postgres rejects
+	// such text as a query parameter instead of finding nothing.
+	if !utf8.ValidString(id) || strings.ContainsRune(id, 0) {
+		return snapshot.Saved{}, fmt.Errorf("loading Snapshot %q: %w", id, snapshot.ErrNotFound)
+	}
 	var (
 		body      string
 		createdAt time.Time
