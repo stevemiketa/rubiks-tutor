@@ -30,10 +30,12 @@ test.describe('with reduced motion', () => {
 
     await panel.getByRole('button', { name: 'Solve' }).click()
 
-    await expect(stages(page)).toHaveText(['White cross'])
+    await expect(stages(page)).toHaveText(['White cross', 'White corners', 'Middle layer'])
     await expect(progress(page)).toHaveText(/^0 of \d+ Moves played$/)
     const { total } = await movesPlayed(page)
     expect(total).toBeGreaterThan(1)
+    // Playback animates every Move of every Stage, about 250 ms a quarter Turn.
+    test.setTimeout(total * 400 + 30_000)
 
     await panel.getByRole('button', { name: 'Play' }).click()
     await panel.getByRole('button', { name: 'Pause' }).click()
@@ -74,6 +76,6 @@ test.describe('with reduced motion', () => {
     await error.getByRole('button', { name: 'Retry' }).click()
 
     await expect(error).toBeHidden()
-    await expect(stages(page)).toHaveText(['White cross'])
+    await expect(stages(page)).toHaveText(['White cross', 'White corners', 'Middle layer'])
   })
 })
