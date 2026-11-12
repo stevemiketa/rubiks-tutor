@@ -5,7 +5,8 @@ const cubeView = (page: Page) => page.getByRole('img', { name: /^The Cube/ })
 
 // A picture of the middle of the 3D view, where only the Cube is drawn: the
 // name and the button sit above and below it. CSS animations (the background
-// gradient) are held still, so only the Cube can change the picture.
+// gradient) are held still, so once the page has faded in, only the Cube can
+// change the picture.
 async function cubePicture(page: Page): Promise<string> {
   const box = await cubeView(page).boundingBox()
   if (box === null) throw new Error('the 3D view is not visible')
@@ -33,7 +34,10 @@ test('the splash page shows the Cube solving itself, without calling the server'
   await expect(page.getByRole('link', { name: 'Start solving' })).toBeVisible()
   await expect(page.getByRole('img', { name: 'The Cube solving itself' })).toBeVisible()
 
-  // Before the first frame, the first frame, then the Cube moving.
+  // The page fades in, which changes the picture too, so wait for it to
+  // finish. Then: before the first frame, the first frame, then the Cube
+  // moving.
+  await expect(page.getByRole('main')).toHaveCSS('opacity', '1')
   const pictures = new Set<string>()
   await expect
     .poll(async () => pictures.add(await cubePicture(page)).size, { timeout: 15_000, intervals: [200] })

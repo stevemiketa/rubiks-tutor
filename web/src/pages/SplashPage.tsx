@@ -4,7 +4,7 @@ import { CubePicture } from '../scene/CubePicture.tsx'
 import { CubeView } from '../scene/CubeView.tsx'
 import { usePrefersReducedMotion } from '../scene/usePrefersReducedMotion.ts'
 import { SPLASH_STILL } from '../splash/recording.ts'
-import { FADE_MS, useSplashLoop } from '../splash/useSplashLoop.ts'
+import { useSplashLoop } from '../splash/useSplashLoop.ts'
 
 const rise = (from: number, delay = 0) => ({
   initial: { opacity: 0, y: from },
@@ -50,16 +50,19 @@ export function SplashPage() {
   )
 }
 
-// Only the Cube fades between passes, not the page around it. It starts
+// Only the Cube fades between passes, not the page around it, taking 0.3 s
+// to fade out and 0.3 s to fade back in. It tells the loop once each fade has
+// finished, so the loop changes the Cube only while it's invisible. It starts
 // shown: the first pass fades in with the page.
 function LoopingCube() {
-  const { queue, faded } = useSplashLoop()
+  const { queue, faded, fadeFinished } = useSplashLoop()
   return (
     <motion.div
       className="splash-cube-fade"
       initial={false}
       animate={{ opacity: faded ? 0 : 1 }}
-      transition={{ duration: FADE_MS / 1000, ease: 'easeInOut' }}
+      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      onAnimationComplete={fadeFinished}
     >
       <CubeView queue={queue} label="The Cube solving itself" className="splash-cube" />
     </motion.div>
