@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { scramble } from './tutor.ts'
 
 const cubeView = (page: Page) => page.getByRole('img', { name: /^The Cube/ })
 
@@ -85,6 +86,10 @@ test.describe('without WebGL', () => {
     await page.getByRole('link', { name: 'Start solving' }).click()
     await expect(page.getByRole('heading', { name: 'Tutor' })).toBeVisible()
     await expect(page.getByText(NO_WEBGL_EXPLANATION)).toBeVisible()
+    // With nothing to animate it, the Scramble is applied at once rather
+    // than left playing for ever.
+    await expect(scramble(page)).toBeVisible()
+    await expect(page.getByText('Scrambling…')).toBeHidden()
 
     expect(errors).toEqual([])
   })
