@@ -4,6 +4,20 @@ import { solutionPanel, stages } from './tutor.ts'
 // How far Playback has got, as the Solution panel shows it.
 const progress = (page: Page) => solutionPanel(page).getByText(/^\d+ of \d+ Moves played$/)
 
+// The indicator the tutor shows while the Cube is solved.
+const solvedIndicator = (page: Page) => page.getByRole('status').getByText('Solved', { exact: true })
+
+// The seven Stages of the beginner's Method, in order.
+const METHOD = [
+  'White cross',
+  'White corners',
+  'Middle layer',
+  'Yellow cross',
+  'Yellow face',
+  'Yellow corners',
+  'Yellow edges',
+]
+
 async function movesPlayed(page: Page): Promise<{ played: number; total: number }> {
   const [played, total] = ((await progress(page).textContent()) ?? '').match(/\d+/g)?.map(Number) ?? []
   if (played === undefined || total === undefined) throw new Error('no Playback progress shown')
@@ -24,13 +38,14 @@ test('Solve waits until the Scramble has finished', async ({ page }) => {
 test.describe('with reduced motion', () => {
   test.use({ reducedMotion: 'reduce' })
 
-  test('Solve lists the Stages, and Play and Pause animate through the Solution', async ({ page }) => {
+  test('Solve lists the Stages, and Play and Pause animate through the Solution to "Solved"', async ({ page }) => {
     await page.goto('/app')
     const panel = solutionPanel(page)
 
     await panel.getByRole('button', { name: 'Solve' }).click()
 
-    await expect(stages(page)).toHaveText(['White cross', 'White corners', 'Middle layer'])
+    await expect(stages(page)).toHaveText(METHOD)
+    await expect(solvedIndicator(page)).toBeHidden()
     await expect(progress(page)).toHaveText(/^0 of \d+ Moves played$/)
     const { total } = await movesPlayed(page)
     expect(total).toBeGreaterThan(1)
@@ -50,6 +65,7 @@ test.describe('with reduced motion', () => {
 
     await expect(progress(page)).toHaveText(`${total} of ${total} Moves played`, { timeout: total * 400 + 5000 })
     await expect(panel.getByRole('button', { name: 'Play' })).toBeDisabled()
+    await expect(solvedIndicator(page)).toBeVisible()
   })
 
   test('Solve on an already-solved Cube says so', async ({ page }) => {
@@ -76,6 +92,6 @@ test.describe('with reduced motion', () => {
     await error.getByRole('button', { name: 'Retry' }).click()
 
     await expect(error).toBeHidden()
-    await expect(stages(page)).toHaveText(['White cross', 'White corners', 'Middle layer'])
+    await expect(stages(page)).toHaveText(METHOD)
   })
 })
