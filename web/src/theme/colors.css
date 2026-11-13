@@ -1,0 +1,73 @@
+/* The color tokens: every color the app's CSS uses, named for what it does.
+   Each one holds its light value, then its dark value, and light-dark() picks
+   by the page's color-scheme. On System the page offers both and the browser
+   follows the OS; a chosen theme pins one (see theme.ts). colors.test.ts
+   reads this file to check every pair's contrast in both themes. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Backgrounds. The page's is the one behind the Cube, which dimmed Pieces
+     fade toward. */
+  --color-bg: light-dark(#f3f4f7, #11131a);
+  --color-surface: light-dark(#ffffff, #1a1d26);
+  --color-surface-overlay: light-dark(rgb(255 255 255 / 0.9), rgb(26 29 38 / 0.85));
+  --color-surface-raised: light-dark(#e8ebf0, #1f2937);
+  --color-surface-card: light-dark(#f1f3f7, #20242f);
+  --color-surface-warning: light-dark(#fdf2d8, #2c2617);
+  --color-surface-danger: light-dark(#fde8e8, #7f1d1d);
+  --color-surface-danger-hover: light-dark(#fbd3d3, #991b1b);
+  --color-control: light-dark(#eef0f4, #252a36);
+  --color-control-hover: light-dark(#e0e4eb, #313848);
+  --color-field: light-dark(#f8f9fb, #11131a);
+
+  /* Text */
+  --color-text: light-dark(#1a1d26, #f1f3f5);
+  --color-text-muted: light-dark(#555e70, #a3aab8);
+  --color-text-disabled: light-dark(#8b93a3, #6b7280);
+  --color-link: light-dark(#0954cd, #8ab4ff);
+  /* The Stage Playback is in: its number and name in the Stage list */
+  --color-current-stage: light-dark(#0954cd, #8ab4ff);
+
+  /* Borders and focus */
+  --color-border: light-dark(#d5d9e1, #3a4150);
+  --color-border-control: light-dark(#767f90, #6e778a);
+  --color-focus: light-dark(#0954cd, #8ab4ff);
+
+  /* The blue accent: primary buttons, the current Move, pressed toggles */
+  --color-accent: #0b64f4;
+  --color-accent-hover: #0a58d7;
+  --color-on-accent: #ffffff;
+  --color-accent-glow: light-dark(rgb(11 100 244 / 0.25), rgb(11 100 244 / 0.35));
+
+  /* Status */
+  --color-success: #15803d;
+  --color-on-success: #ffffff;
+  --color-danger-border: light-dark(#c81e1e, #f36464);
+  --color-warning: light-dark(#b45309, #f59e0b);
+  --color-on-warning: light-dark(#ffffff, #11131a);
+  /* The border of a Stale solution's notice */
+  --color-stale-solution: light-dark(#c2410c, #d97706);
+  /* The pink of the Cube's selection marker */
+  --color-hint: light-dark(#cc009c, #ff3fd2);
+
+  /* The splash page: its gradient, and the name and tagline over the Cube */
+  --color-splash-1: light-dark(#e8ecfb, #0b1020);
+  --color-splash-2: light-dark(#eee6fb, #24164a);
+  --color-splash-3: light-dark(#e2f0f4, #0d2c3a);
+  --color-splash-4: light-dark(#f7e8f2, #2b0f33);
+  --color-splash-subtitle: light-dark(#3d4455, #c9cee0);
+  --color-splash-title-shadow: light-dark(rgb(255 255 255 / 0.7), rgb(0 0 0 / 0.6));
+  --color-splash-subtitle-shadow: light-dark(rgb(255 255 255 / 0.8), rgb(0 0 0 / 0.7));
+
+  /* Behind a dialog */
+  --color-backdrop: light-dark(rgb(17 19 26 / 0.4), rgb(0 0 0 / 0.6));
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}

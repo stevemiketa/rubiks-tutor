@@ -8,6 +8,7 @@ import { ScramblePanel } from '../tutor/ScramblePanel.tsx'
 import { Share } from '../tutor/Share.tsx'
 import { SnapshotMissing } from '../tutor/SnapshotMissing.tsx'
 import { SolutionPanel } from '../tutor/SolutionPanel.tsx'
+import { ThemeControl } from '../tutor/ThemeControl.tsx'
 import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useSnapshotAddress } from '../tutor/useSnapshotAddress.ts'
 import { useTutor } from '../tutor/useTutor.ts'
@@ -38,6 +39,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
             onClose={() => tutor.closeShare()}
           />
           <NotationSheet />
+          <ThemeControl />
         </div>
       </header>
 

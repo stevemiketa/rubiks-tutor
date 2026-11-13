@@ -4,6 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Cubular</title>
+    <script>
+      // Shows a saved Light or Dark theme from the first paint, before the
+      // app starts (see src/theme/theme.ts). A Content-Security-Policy must
+      // allow this script by its hash.
+      try {
+        const saved = localStorage.getItem('cubular.theme')
+        if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved
+      } catch {
+        // Without storage the page follows the OS.
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

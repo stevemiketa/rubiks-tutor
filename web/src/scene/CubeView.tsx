@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { moveAxis, type Move, type Sticker } from '../cube/index.ts'
 import { QUARTER_TURN_MS, snapRotations, type MoveQueue, type QueuedMove } from '../session/index.ts'
+import { useTheme } from '../theme/useTheme.ts'
 import { CubeModel } from './cubeModel.ts'
 import { CAMERA } from './look.ts'
 import { prefersReducedMotion } from './usePrefersReducedMotion.ts'
@@ -72,6 +73,12 @@ function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, highlight
 
 type AnimatedCubeProps = Pick<CubeViewProps, 'queue' | 'selected' | 'onSelect' | 'selectable' | 'onRotate' | 'highlighted'>
 
+/**
+ * The page's background, the color behind the Cube: the canvas is transparent.
+ * On the splash page the Cube sits over a gradient instead, but nothing there is dimmed.
+ */
+const pageBackground = (): string => getComputedStyle(document.documentElement).backgroundColor
+
 // A drag turns the Cube this far for each pixel, so dragging across half the
 // view makes about a quarter turn.
 const RADIANS_PER_VIEW_HEIGHT = Math.PI
@@ -88,7 +95,8 @@ function quaternionOf(move: Move): THREE.Quaternion {
 }
 
 function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted }: AnimatedCubeProps) {
-  const model = useMemo(() => new CubeModel(), [])
+  const theme = useTheme()
+  const model = useMemo(() => new CubeModel(pageBackground(), theme), [])
   // Turns the whole Cube while it is dragged and as it settles square-on.
   // The Moves it shows are in the model, so between drags it is at rest.
   const dragGroup = useMemo(() => new THREE.Group(), [])
@@ -121,6 +129,13 @@ function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlig
     model.highlight(highlighted)
     invalidate()
   }, [model, highlighted, invalidate])
+
+  // A new theme brings a new background for dimmed Pieces to fade toward.
+  // It only recolors them, so a Move or Playback in progress carries on.
+  useEffect(() => {
+    model.fadeToward(pageBackground(), theme)
+    invalidate()
+  }, [model, theme, invalidate])
 
   useEffect(() => {
     if (onRotate === undefined) return

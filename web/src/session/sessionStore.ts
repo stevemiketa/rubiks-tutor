@@ -39,15 +39,3 @@ export class SessionStore {
     }
   }
 }
-
-/**
- * The browser's localStorage, or undefined where it isn't available: some
- * browsers throw on reading it when site data is blocked.
- */
-export function browserStorage(): StorageLike | undefined {
-  try {
-    return globalThis.localStorage ?? undefined
-  } catch {
-    return undefined
-  }
-}

@@ -1,7 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
-import { clickFrontCenter, moveHistory, scramble } from './tutor.ts'
-
-const shareButton = (page: Page) => page.getByRole('button', { name: 'Share', exact: true })
+import { expect, test } from '@playwright/test'
+import { clickFrontCenter, moveHistory, scramble, shareButton, shareDialog } from './tutor.ts'
 
 test('Share waits for the Scramble to finish', async ({ page }) => {
   await page.goto('/app')
@@ -26,7 +24,7 @@ test.describe('with reduced motion', () => {
     await expect(moveHistory(page)).toHaveText(["M'", 'E', 'y'])
 
     await shareButton(page).click()
-    const dialog = page.getByRole('dialog', { name: 'Share this Cube' })
+    const dialog = shareDialog(page)
     const link = dialog.getByRole('textbox', { name: 'Share link' })
     await expect(link).toHaveValue(/^http:\/\/127\.0\.0\.1:\d+\/s\/[\w-]{10}$/)
     const url = await link.inputValue()
