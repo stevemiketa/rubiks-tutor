@@ -96,7 +96,7 @@ function quaternionOf(move: Move): THREE.Quaternion {
 
 function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted }: AnimatedCubeProps) {
   const theme = useTheme()
-  const model = useMemo(() => new CubeModel(pageBackground()), [])
+  const model = useMemo(() => new CubeModel(pageBackground(), theme), [])
   // Turns the whole Cube while it is dragged and as it settles square-on.
   // The Moves it shows are in the model, so between drags it is at rest.
   const dragGroup = useMemo(() => new THREE.Group(), [])
@@ -133,7 +133,7 @@ function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlig
   // A new theme brings a new background for dimmed Pieces to fade toward.
   // It only recolors them, so a Move or Playback in progress carries on.
   useEffect(() => {
-    model.fadeToward(pageBackground())
+    model.fadeToward(pageBackground(), theme)
     invalidate()
   }, [model, theme, invalidate])
 
