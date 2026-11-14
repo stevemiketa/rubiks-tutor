@@ -8,6 +8,22 @@ Cubular is a 3D tutor that teaches people to solve a 3×3×3 cube by walking the
 The 3×3×3 twisty puzzle, using the standard color scheme: white opposite yellow, green opposite blue, red opposite orange.
 _Avoid_: Rubik's Cube (a trademark), puzzle
 
+**Puzzle**:
+Any twisty puzzle Cubular can teach. The Cube is the original; the Pocket Cube and the Mirror Cube are the first additions. A Session, a Snapshot, and a Solve each carry a puzzle type.
+_Avoid_: variant, mode
+
+**Pocket Cube**:
+The 2×2×2 Cube — corners only, with no edges or centers. Cubular models it as a corners-only 3×3, so eight corner Pieces do the work and the rest are phantom.
+_Avoid_: mini cube, baby cube
+
+**Mirror Cube**:
+A Cube whose Pieces are different sizes and a single color, solved by shape instead of color. Mechanically identical to the Cube; Cubular keeps the standard colors under the hood and changes only the look.
+_Avoid_: bump cube, mirror blocks
+
+**Phantom Piece**:
+On the Pocket Cube, an edge or center Piece that exists in the 3×3 model but is frozen at solved and never shown.
+_Avoid_: ghost piece, hidden piece
+
 **Piece**:
 One of the 26 small cubes that make up the Cube.
 _Avoid_: cubie, cubelet, block
