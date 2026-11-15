@@ -81,6 +81,20 @@ describe('Session puzzle', () => {
     expect(play(session, "D' L' F U' R'").isSolved()).toBe(true)
   })
 
+  it('stays solved when a Pocket Cube is rotated as a whole', () => {
+    // A whole-Cube rotation is rigid: it must move the Phantom centers with
+    // the corners, so a solved Pocket Cube reads as solved in any orientation.
+    expect(play(Session.start([], 'pocket'), 'x').isSolved()).toBe(true)
+    expect(play(Session.start([], 'pocket'), 'y x2 z').isSolved()).toBe(true)
+  })
+
+  it('returns a Pocket Cube to solved after a rotation and face Turns are undone', () => {
+    // A sequence may mix a whole-Cube rotation with face Turns; undoing the
+    // face Turns in reverse (the rotation stays) must reach solved again.
+    const session = play(Session.start([], 'pocket'), 'x R U')
+    expect(play(session, "U' R'").isSolved()).toBe(true)
+  })
+
   it('leaves a 3x3 evolving with full Moves: the same Turns reach different states', () => {
     const cube = play(Session.start(parseMoves('R U'), 'cube'), "F'").cube.toString()
     const pocket = play(Session.start(parseMoves('R U'), 'pocket'), "F'").cube.toString()

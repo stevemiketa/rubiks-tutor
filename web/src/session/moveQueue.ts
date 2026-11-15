@@ -2,7 +2,7 @@
 // Turns, a Scramble, Playback, the splash page's loop) enqueues them here,
 // and the 3D scene animates them one at a time, so input that arrives during
 // an animation waits its turn instead of being dropped or jumping ahead.
-import { DEFAULT_PUZZLE, type Cube, type Move, type Puzzle } from '../cube/index.ts'
+import { DEFAULT_PUZZLE, isRotation, type Cube, type Move, type Puzzle } from '../cube/index.ts'
 
 /** How long a quarter Turn or Cube rotation takes at normal speed, in ms. */
 export const QUARTER_TURN_MS = 250
@@ -40,9 +40,15 @@ export class MoveQueue {
     this.#puzzle = puzzle
   }
 
-  // Applies Moves the way this queue's Puzzle does: corner-only for a Pocket Cube.
+  // Applies Moves the way this queue's Puzzle does. A Pocket Cube splits per
+  // Move: a whole-Cube rotation (x/y/z) is rigid, applied with full Cube.apply
+  // so a solved 2x2 stays solved in any orientation; a face Turn is corner-only
+  // (Cube.applyPocket), so its Phantom Stickers stay frozen (ADR 0005). This
+  // matches how a Pocket Cube Session evolves its Cube.
   #apply(cube: Cube, moves: readonly Move[]): Cube {
-    return this.#puzzle === 'pocket' ? cube.applyPocket(moves) : cube.apply(moves)
+    if (this.#puzzle !== 'pocket') return cube.apply(moves)
+    for (const move of moves) cube = isRotation(move) ? cube.apply([move]) : cube.applyPocket([move])
+    return cube
   }
 
   /** The Cube with every finished Move applied: what the scene shows at rest. */

@@ -110,14 +110,18 @@ func TestSolveRoutesTheTypeToThePuzzle(t *testing.T) {
 	})
 }
 
-func TestSolveRejectsAnUnknownTypeAndNonFaceTurnsForA2x2(t *testing.T) {
+func TestSolveRejectsAnUnknownTypeAndSliceOrWideTurnsForA2x2(t *testing.T) {
+	// A 2x2 has no middle Layer, so slice Moves (M E S) and wide Turns are
+	// rejected; whole-Cube rotations (x y z) are accepted, as a fixed camera
+	// needs them to see the other sides (ADR 0005).
 	h := newTestServer(t)
 	for _, tc := range []struct {
 		name, body, code, field string
 	}{
 		{"an unknown type", `{"scramble":"R","moves":"","type":"4x4"}`, "invalid-type", "type"},
 		{"a middle-Layer Turn in a 2x2 Scramble", `{"scramble":"R M","moves":"","type":"2x2"}`, "invalid-notation", "scramble"},
-		{"a Cube rotation in a 2x2 history", `{"scramble":"R","moves":"x","type":"2x2"}`, "invalid-notation", "moves"},
+		{"an S slice in a 2x2 history", `{"scramble":"R","moves":"S","type":"2x2"}`, "invalid-notation", "moves"},
+		{"an E slice in a 2x2 history", `{"scramble":"R","moves":"E'","type":"2x2"}`, "invalid-notation", "moves"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			res := post(t, h, "/api/solve", tc.body)
@@ -128,6 +132,38 @@ func TestSolveRejectsAnUnknownTypeAndNonFaceTurnsForA2x2(t *testing.T) {
 				t.Errorf("error %+v, want code %s, field %s", got, tc.code, tc.field)
 			}
 		})
+	}
+}
+
+func TestSolveAcceptsAWholeCubeRotationForA2x2(t *testing.T) {
+	// A whole-Cube rotation is rigid on a Pocket Cube: reconstructing the Cube
+	// with full Apply keeps the corner-to-center relationship, so a solve
+	// request whose history contains a rotation succeeds and the returned
+	// Solution is rotation-free and reaches solved.
+	h := newTestServer(t)
+	const scramble = "R U R' F2 R U' R' U R2 F R F'"
+	const history = "x" // see the other sides; must stay a real logical Move
+
+	s := solveTyped(t, h, scramble, history, "2x2")
+	if s.Solved {
+		t.Fatalf("a rotated scrambled 2x2 reports solved; want Stages to solve it")
+	}
+	for _, st := range s.Stages {
+		for _, m := range st.moves(t) {
+			if m.IsRotation() {
+				t.Errorf("2x2 Stage %s has Cube rotation %v in %q; a 2x2 Solution must be rotation-free", st.ID, m, st.Moves)
+			}
+		}
+	}
+	// The Cube the request describes, reached the same rigid way: the Scramble
+	// and the rotation move the whole Cube, so replaying the rotation-free
+	// Solution's Turns with corner-only semantics reaches solved.
+	c := cube.Solved().ApplyPocket(cube.MustParseMoves(scramble)...).Apply(cube.MustParseMoves(history)...)
+	for _, st := range s.Stages {
+		c = c.ApplyPocket(st.moves(t)...)
+	}
+	if !c.IsSolved() {
+		t.Errorf("the 2x2 Solution %v left the rotated Pocket Cube unsolved: %v", stageIDs(s), c)
 	}
 }
 

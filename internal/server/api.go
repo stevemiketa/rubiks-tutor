@@ -48,13 +48,29 @@ type movesRequest struct {
 }
 
 // Cube returns the Cube the request describes: a solved Cube, then the
-// Scramble, then the Move history. A Pocket Cube evolves with corner-only
-// semantics, so its phantom edges and centers stay frozen (ADR 0005).
+// Scramble, then the Move history. A Pocket Cube splits per Move: a whole-Cube
+// rotation (x/y/z) is rigid, applied with full Apply so it moves the phantom
+// centers and edges together with the corners and a solved 2x2 stays solved in
+// any orientation; a face Turn is corner-only (ApplyPocket), so its phantom
+// edges and centers stay frozen (ADR 0005).
 func (r movesRequest) Cube() cube.Cube {
 	if r.Puzzle == cube.Pocket {
-		return cube.Solved().ApplyPocket(r.Scramble...).ApplyPocket(r.Moves...)
+		return applyPocketMoves(applyPocketMoves(cube.Solved(), r.Scramble), r.Moves)
 	}
 	return cube.Solved().Apply(r.Scramble...).Apply(r.Moves...)
+}
+
+// applyPocketMoves applies Moves to a Pocket Cube the rigid way: rotations
+// move the whole Cube (Apply), face Turns move only the corners (ApplyPocket).
+func applyPocketMoves(c cube.Cube, moves []cube.Move) cube.Cube {
+	for _, m := range moves {
+		if m.IsRotation() {
+			c = c.Apply(m)
+		} else {
+			c = c.ApplyPocket(m)
+		}
+	}
+	return c
 }
 
 // decodeMovesRequest reads and checks a movesRequest body: one JSON object
@@ -119,16 +135,18 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 				Offset:  &perr.Offset,
 			}
 		}
-		// A Pocket Cube is corner-only: only outer-Layer face Turns move its
-		// Pieces, so reject middle-Layer Turns and Cube rotations here rather
-		// than let them reach the corner-only Move engine (ADR 0005).
+		// A 2x2 has no middle Layer: only outer-Layer face Turns and whole-Cube
+		// rotations make sense for it. A rotation is rigid (it turns the whole
+		// Cube); a face Turn is corner-only. Reject slice Moves (M E S) and any
+		// wide Turns here rather than let them reach the Pocket Move engine
+		// (ADR 0005). Wide Turns are already rejected at parse time.
 		if req.Puzzle == cube.Pocket {
 			for _, m := range moves {
-				if !isOuterTurn(m) {
+				if !isOuterTurn(m) && !m.IsRotation() {
 					return movesRequest{}, &apiError{
 						status:  http.StatusBadRequest,
 						Code:    "invalid-notation",
-						Message: fmt.Sprintf("%s: %v is not an outer-Layer Turn, which a 2x2 needs", f.name, m),
+						Message: fmt.Sprintf("%s: %v is not a face Turn or Cube rotation, which a 2x2 has no middle Layer for", f.name, m),
 						Field:   f.name,
 						Token:   m.String(),
 					}

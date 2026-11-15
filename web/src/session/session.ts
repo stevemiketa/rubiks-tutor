@@ -631,12 +631,17 @@ function sameSnapshot(a: Fields, b: Fields): boolean {
 }
 
 /**
- * Applies Moves to a Cube the way a Puzzle does: a Pocket Cube evolves
- * corner-only (Cube.applyPocket), so its Phantom Stickers stay solved, and the
- * 3x3 uses the full permutation.
+ * Applies Moves to a Cube the way a Puzzle does. A Pocket Cube splits per
+ * Move: a whole-Cube rotation (x/y/z) is rigid, applied with full Cube.apply
+ * so it moves the Phantom centers and edges together with the corners and a
+ * solved 2x2 stays solved in any orientation; a face Turn is corner-only
+ * (Cube.applyPocket), so its Phantom Stickers stay frozen (ADR 0005). The 3x3
+ * uses the full permutation throughout.
  */
 function applyFor(puzzle: Puzzle, cube: Cube, moves: readonly Move[]): Cube {
-  return puzzle === 'pocket' ? cube.applyPocket(moves) : cube.apply(moves)
+  if (puzzle !== 'pocket') return cube.apply(moves)
+  for (const move of moves) cube = isRotation(move) ? cube.apply([move]) : cube.applyPocket([move])
+  return cube
 }
 
 function write<K extends keyof Fields>(name: K, fields: Fields): unknown {
