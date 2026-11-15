@@ -58,6 +58,7 @@ type shared struct {
 
 type loaded struct {
 	ID        string `json:"id"`
+	Type      string `json:"type"`
 	Scramble  string `json:"scramble"`
 	Moves     string `json:"moves"`
 	CreatedAt string `json:"createdAt"`
@@ -105,7 +106,7 @@ func TestASharedSnapshotLoadsBackByItsID(t *testing.T) {
 		t.Errorf("Cache-Control %q, want %q", got, want)
 	}
 	snap := decode[loaded](t, res)
-	if snap.ID != "ylB675OCSe" || snap.Scramble != "R U R' U'" || snap.Moves != "M E x" {
+	if snap.ID != "ylB675OCSe" || snap.Type != "3x3" || snap.Scramble != "R U R' U'" || snap.Moves != "M E x" {
 		t.Errorf("loaded %+v, want the shared Snapshot", snap)
 	}
 	createdAt, err := time.Parse(time.RFC3339Nano, snap.CreatedAt)
@@ -114,6 +115,25 @@ func TestASharedSnapshotLoadsBackByItsID(t *testing.T) {
 	}
 	if createdAt.Before(before.Add(-time.Second)) || createdAt.After(time.Now()) {
 		t.Errorf("createdAt %v, want about %v", createdAt, before)
+	}
+}
+
+func TestAPocketSnapshotRoundTripsItsType(t *testing.T) {
+	h := newTestServer(t)
+
+	// A Pocket Cube Snapshot carries type "2x2"; its Moves are face Turns only.
+	got := mustShare(t, h, `{"scramble": "R U R' U'", "moves": "R", "type": "2x2"}`)
+
+	// The type is part of the hashed body, so a Pocket Snapshot can't share an
+	// ID with the otherwise-identical Cube one.
+	cube3x3 := mustShare(t, h, `{"scramble": "R U R' U'", "moves": "R"}`)
+	if got.ID == cube3x3.ID {
+		t.Errorf("the Pocket and Cube Snapshots got the same ID %q", got.ID)
+	}
+
+	snap := decode[loaded](t, get(t, h, "/api/snapshots/"+got.ID))
+	if snap.Type != "2x2" || snap.Scramble != "R U R' U'" || snap.Moves != "R" {
+		t.Errorf("loaded %+v, want a 2x2 Snapshot", snap)
 	}
 }
 
