@@ -27,8 +27,8 @@ const PATH_FOR: Readonly<Record<Puzzle, string>> = { cube: '/app', pocket: '/app
 // are read only once.
 export function TutorPage({ snapshotId, puzzle }: { snapshotId?: string; puzzle?: Puzzle }) {
   const { tutor, state } = useTutor(snapshotId, puzzle)
-  useSnapshotAddress(state.snapshotId)
   const { session, opening } = state
+  useSnapshotAddress(state.snapshotId, PATH_FOR[session.puzzle])
   const solved = session.isSolved()
   // Moves, Solve and Share wait for the Scramble and for a share link's Snapshot.
   const waiting = state.scrambling || opening !== undefined
