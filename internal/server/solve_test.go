@@ -31,6 +31,106 @@ func solveBody(t *testing.T, scramble, moves string) string {
 	return string(b)
 }
 
+// solveBodyFor is a POST /api/solve request body with an explicit puzzle type.
+func solveBodyFor(t *testing.T, scramble, moves, puzzleType string) string {
+	t.Helper()
+	b, err := json.Marshal(map[string]string{"scramble": scramble, "moves": moves, "type": puzzleType})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// solveTyped posts a solve request with a type and decodes the Solution.
+func solveTyped(t *testing.T, h http.Handler, scramble, moves, puzzleType string) solutionBody {
+	t.Helper()
+	res := post(t, h, "/api/solve", solveBodyFor(t, scramble, moves, puzzleType))
+	raw := body(t, res)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("solving %q then %q as %q: status %d: %s", scramble, moves, puzzleType, res.StatusCode, raw)
+	}
+	var s solutionBody
+	if err := json.Unmarshal([]byte(raw), &s); err != nil {
+		t.Fatalf("solving %q then %q as %q: body is not a Solution: %v: %s", scramble, moves, puzzleType, err, raw)
+	}
+	return s
+}
+
+func TestSolveRoutesTheTypeToThePuzzle(t *testing.T) {
+	h := newTestServer(t)
+	// Corner-only face Turns, so the Cube is a valid Pocket Cube Scramble.
+	const scramble = "R U R' F2 R U' R' U R2 F R F'"
+
+	t.Run("2x2 uses only the corner Stages", func(t *testing.T) {
+		s := solveTyped(t, h, scramble, "", "2x2")
+		if s.Solved || len(s.Stages) == 0 {
+			t.Fatalf("got solved=%v with %d Stages", s.Solved, len(s.Stages))
+		}
+		for _, st := range s.Stages {
+			switch st.ID {
+			case "white-corners", "yellow-face", "yellow-corners":
+			default:
+				t.Errorf("2x2 Solution has Stage %q, want only the three corner Stages", st.ID)
+			}
+			for _, m := range st.moves(t) {
+				if m.IsRotation() {
+					t.Errorf("2x2 Stage %s has Cube rotation %v in its Moves %q", st.ID, m, st.Moves)
+				}
+			}
+		}
+		// Replaying every Stage's Moves with corner-only semantics solves the
+		// Pocket Cube.
+		c := cube.Solved().ApplyPocket(cube.MustParseMoves(scramble)...)
+		for _, st := range s.Stages {
+			c = c.ApplyPocket(st.moves(t)...)
+		}
+		if !c.IsSolved() {
+			t.Errorf("the 2x2 Solution %v left the Pocket Cube unsolved: %v", stageIDs(s), c)
+		}
+	})
+
+	t.Run("a missing type is the 3x3", func(t *testing.T) {
+		withType := solveTyped(t, h, scramble, "", "3x3")
+		withoutType := solve(t, h, scramble, "")
+		if !slices.Equal(stageIDs(withType), stageIDs(withoutType)) {
+			t.Errorf("missing type gave Stages %v, want the 3x3's %v", stageIDs(withoutType), stageIDs(withType))
+		}
+		// The 3x3 Solution for this Scramble runs the full Method, so it has
+		// more than the three corner Stages a 2x2 would.
+		if len(stageIDs(withoutType)) <= 3 {
+			t.Errorf("a 3x3 Solution has only %d Stages: %v", len(stageIDs(withoutType)), stageIDs(withoutType))
+		}
+	})
+
+	t.Run("an already-solved 2x2 reports solved", func(t *testing.T) {
+		s := solveTyped(t, h, "R U R' U'", "U R U' R'", "2x2")
+		if !s.Solved || s.Stages != nil {
+			t.Errorf("got solved=%v with Stages %v, want solved with no Stages", s.Solved, stageIDs(s))
+		}
+	})
+}
+
+func TestSolveRejectsAnUnknownTypeAndNonFaceTurnsForA2x2(t *testing.T) {
+	h := newTestServer(t)
+	for _, tc := range []struct {
+		name, body, code, field string
+	}{
+		{"an unknown type", `{"scramble":"R","moves":"","type":"4x4"}`, "invalid-type", "type"},
+		{"a middle-Layer Turn in a 2x2 Scramble", `{"scramble":"R M","moves":"","type":"2x2"}`, "invalid-notation", "scramble"},
+		{"a Cube rotation in a 2x2 history", `{"scramble":"R","moves":"x","type":"2x2"}`, "invalid-notation", "moves"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := post(t, h, "/api/solve", tc.body)
+			if res.StatusCode != http.StatusBadRequest {
+				t.Fatalf("status %d, want 400: %s", res.StatusCode, body(t, res))
+			}
+			if got := decodeError(t, res); got.Code != tc.code || got.Field != tc.field {
+				t.Errorf("error %+v, want code %s, field %s", got, tc.code, tc.field)
+			}
+		})
+	}
+}
+
 func TestSolveReportsASolvedCube(t *testing.T) {
 	for _, tc := range []struct{ name, scramble, moves string }{
 		{"nothing to undo", "", ""},

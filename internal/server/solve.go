@@ -15,7 +15,7 @@ func handleSolve(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apiErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, solveResponseFor(solver.Solve(req.Cube())))
+	writeJSON(w, http.StatusOK, solveResponseFor(solver.Solve(req.Cube(), req.Puzzle)))
 }
 
 // solveResponse is the POST /api/solve response body: {"solved":true}, or

@@ -39,25 +39,33 @@ func writeError(w http.ResponseWriter, e *apiError) {
 }
 
 // movesRequest is a request body that carries a Session's Moves: a Scramble
-// and a Move history, each in space-separated notation.
+// and a Move history, each in space-separated notation, and the Puzzle the
+// Session is for.
 type movesRequest struct {
 	Scramble []cube.Move
 	Moves    []cube.Move
+	Puzzle   cube.Puzzle
 }
 
 // Cube returns the Cube the request describes: a solved Cube, then the
-// Scramble, then the Move history.
+// Scramble, then the Move history. A Pocket Cube evolves with corner-only
+// semantics, so its phantom edges and centers stay frozen (ADR 0005).
 func (r movesRequest) Cube() cube.Cube {
+	if r.Puzzle == cube.Pocket {
+		return cube.Solved().ApplyPocket(r.Scramble...).ApplyPocket(r.Moves...)
+	}
 	return cube.Solved().Apply(r.Scramble...).Apply(r.Moves...)
 }
 
 // decodeMovesRequest reads and checks a movesRequest body: one JSON object
-// with both fields, valid notation, and no more than maxMoves Moves in a
-// body of at most maxBodyBytes.
+// with the scramble and moves fields, an optional "type" that names a Puzzle
+// (a missing type is the Cube), valid notation, and no more than maxMoves Moves
+// in a body of at most maxBodyBytes.
 func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *apiError) {
 	var body struct {
 		Scramble *string `json:"scramble"`
 		Moves    *string `json:"moves"`
+		Type     *string `json:"type"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	err := dec.Decode(&body)
@@ -83,6 +91,18 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 	}
 
 	var req movesRequest
+	if body.Type != nil {
+		puzzle, ok := cube.ParsePuzzle(*body.Type)
+		if !ok {
+			return movesRequest{}, &apiError{
+				status:  http.StatusBadRequest,
+				Code:    "invalid-type",
+				Message: fmt.Sprintf(`%q is not a Puzzle type; want "3x3" or "2x2"`, *body.Type),
+				Field:   "type",
+			}
+		}
+		req.Puzzle = puzzle
+	}
 	for _, f := range []struct {
 		name     string
 		notation string
@@ -99,6 +119,22 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 				Offset:  &perr.Offset,
 			}
 		}
+		// A Pocket Cube is corner-only: only outer-Layer face Turns move its
+		// Pieces, so reject middle-Layer Turns and Cube rotations here rather
+		// than let them reach the corner-only Move engine (ADR 0005).
+		if req.Puzzle == cube.Pocket {
+			for _, m := range moves {
+				if !isOuterTurn(m) {
+					return movesRequest{}, &apiError{
+						status:  http.StatusBadRequest,
+						Code:    "invalid-notation",
+						Message: fmt.Sprintf("%s: %v is not an outer-Layer Turn, which a 2x2 needs", f.name, m),
+						Field:   f.name,
+						Token:   m.String(),
+					}
+				}
+			}
+		}
 		*f.moves = moves
 	}
 	if n := len(req.Scramble) + len(req.Moves); n > maxMoves {
@@ -109,4 +145,14 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 		}
 	}
 	return req, nil
+}
+
+// isOuterTurn reports whether m is an outer-Layer face Turn (R L U D F B),
+// the only Moves that move a Pocket Cube's Pieces.
+func isOuterTurn(m cube.Move) bool {
+	switch m.Letter {
+	case 'R', 'L', 'U', 'D', 'F', 'B':
+		return true
+	}
+	return false
 }

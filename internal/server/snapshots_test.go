@@ -88,16 +88,16 @@ func TestASharedSnapshotLoadsBackByItsID(t *testing.T) {
 	got := mustShare(t, h, `{"scramble": "R U R' U'", "moves": "M E x"}`)
 
 	// The ID is the first 10 characters of the URL-safe base64 SHA-256 of
-	// {"version":1,"scramble":"R U R' U'","moves":"M E x"}, worked out
-	// with openssl.
-	if got.ID != "ZG6IiOeAXz" {
-		t.Errorf("id %q, want ZG6IiOeAXz", got.ID)
+	// {"version":2,"type":"3x3","scramble":"R U R' U'","moves":"M E x"}:
+	// the request has no type, so the Snapshot is the Cube (ADR 0005).
+	if got.ID != "ylB675OCSe" {
+		t.Errorf("id %q, want ylB675OCSe", got.ID)
 	}
-	if want := "http://example.com/s/ZG6IiOeAXz"; got.URL != want {
+	if want := "http://example.com/s/ylB675OCSe"; got.URL != want {
 		t.Errorf("url %q, want %q", got.URL, want)
 	}
 
-	res := get(t, h, "/api/snapshots/ZG6IiOeAXz")
+	res := get(t, h, "/api/snapshots/ylB675OCSe")
 	if res.StatusCode != http.StatusOK {
 		t.Fatalf("GET: status %d, want 200", res.StatusCode)
 	}
@@ -105,7 +105,7 @@ func TestASharedSnapshotLoadsBackByItsID(t *testing.T) {
 		t.Errorf("Cache-Control %q, want %q", got, want)
 	}
 	snap := decode[loaded](t, res)
-	if snap.ID != "ZG6IiOeAXz" || snap.Scramble != "R U R' U'" || snap.Moves != "M E x" {
+	if snap.ID != "ylB675OCSe" || snap.Scramble != "R U R' U'" || snap.Moves != "M E x" {
 		t.Errorf("loaded %+v, want the shared Snapshot", snap)
 	}
 	createdAt, err := time.Parse(time.RFC3339Nano, snap.CreatedAt)
@@ -221,7 +221,7 @@ func TestAnUnknownSnapshotIsNotFound(t *testing.T) {
 	h := newTestServer(t)
 	mustShare(t, h, `{"scramble": "R U R' U'", "moves": "M E x"}`)
 
-	for _, id := range []string{"Ab3_x-9QzK", "ZG6IiOeAX", "ZG6IiOeAXzz", "nope"} {
+	for _, id := range []string{"Ab3_x-9QzK", "ylB675OCS", "ylB675OCSez", "nope"} {
 		t.Run(id, func(t *testing.T) {
 			res := get(t, h, "/api/snapshots/"+id)
 

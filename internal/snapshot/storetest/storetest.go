@@ -17,11 +17,11 @@ import (
 
 // The Scrambles of two Snapshots, with no Moves after them, whose IDs share
 // their first snapshot.IDLength characters, found by findcollision.go in this
-// directory. Their hashes, worked out with openssl, start
-// CFIoSNdf-CyS2xPdX... and CFIoSNdf-CIcocThV...
+// directory for the version-2 body format. Their hashes start
+// TpcXWrEFyszv... and TpcXWrEFys1f...
 const (
-	collidingA = "F' R2 F D' U2 F L2 D2 F2 D' D F' U2 D2 D2"
-	collidingB = "R' D F2 F F2 R2 F D2 F' D2 F U' L2 R2 D"
+	collidingA = "L F2 U' B F' U2 L2 R2 F2 U' U B R' D2 U'"
+	collidingB = "B R L2 D D' L F' U' R F D F' L' D L"
 )
 
 // Run runs the suite. newStore opens a store for one test; the suite doesn't
@@ -103,11 +103,11 @@ func Run(t *testing.T, newStore func(t *testing.T) snapshot.Store) {
 		idA := save(t, store, a)
 		idB := save(t, store, b)
 
-		if idA != "CFIoSNdf-C" {
-			t.Errorf("first ID %q, want CFIoSNdf-C", idA)
+		if idA != "TpcXWrEFys" {
+			t.Errorf("first ID %q, want TpcXWrEFys", idA)
 		}
-		if idB != "CFIoSNdf-CI" {
-			t.Errorf("second ID %q, want CFIoSNdf-CI: the first ID lengthened by one character", idB)
+		if idB != "TpcXWrEFys1" {
+			t.Errorf("second ID %q, want TpcXWrEFys1: the first ID lengthened by one character", idB)
 		}
 		assertSame(t, load(t, store, idA).Snapshot, a)
 		assertSame(t, load(t, store, idB).Snapshot, b)
