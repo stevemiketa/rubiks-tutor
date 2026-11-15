@@ -1,8 +1,11 @@
+import type { Puzzle } from '../cube/index.ts'
+import { navigate } from '../routing/navigation.ts'
 import { Link } from '../routing/Link.tsx'
 import { CubeView } from '../scene/CubeView.tsx'
 import { isSelectable } from '../session/index.ts'
 import { MoveHistory } from '../tutor/MoveHistory.tsx'
 import { NotationSheet } from '../tutor/NotationSheet.tsx'
+import { PuzzleSwitch } from '../tutor/PuzzleSwitch.tsx'
 import { RotateControls } from '../tutor/RotateControls.tsx'
 import { ScramblePanel } from '../tutor/ScramblePanel.tsx'
 import { Share } from '../tutor/Share.tsx'
@@ -13,16 +16,29 @@ import { TurnControls } from '../tutor/TurnControls.tsx'
 import { useSnapshotAddress } from '../tutor/useSnapshotAddress.ts'
 import { useTutor } from '../tutor/useTutor.ts'
 
+// The path the address bar shows for a Puzzle, so the in-tutor switch keeps the
+// URL honest (the page stays mounted, so this doesn't reload it).
+const PATH_FOR: Readonly<Record<Puzzle, string>> = { cube: '/app', pocket: '/app/2x2' }
+
 // snapshotId is set when the tutor was opened from a share link, which
-// opens that Snapshot. The page stays mounted when the address switches
-// between /app and a share link, so it is read only once.
-export function TutorPage({ snapshotId }: { snapshotId?: string }) {
-  const { tutor, state } = useTutor(snapshotId)
+// opens that Snapshot. puzzle is the Puzzle the route asks a new Session to
+// solve (the 3x3 by default, the Pocket Cube at /app/2x2). The page stays
+// mounted when the address switches between /app and a share link, so both
+// are read only once.
+export function TutorPage({ snapshotId, puzzle }: { snapshotId?: string; puzzle?: Puzzle }) {
+  const { tutor, state } = useTutor(snapshotId, puzzle)
   useSnapshotAddress(state.snapshotId)
   const { session, opening } = state
   const solved = session.isSolved()
   // Moves, Solve and Share wait for the Scramble and for a share link's Snapshot.
   const waiting = state.scrambling || opening !== undefined
+
+  // Switching Puzzle starts a fresh Session of it and points the address bar at
+  // its route; staying on the same Puzzle is just a new Scramble.
+  function switchPuzzle(next: Puzzle) {
+    tutor.newPuzzle(next)
+    if (next !== session.puzzle) navigate(PATH_FOR[next])
+  }
 
   return (
     <main className="tutor">
@@ -32,6 +48,7 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
         </Link>
         <h1>Tutor</h1>
         <div className="tutor-tools">
+          <PuzzleSwitch puzzle={session.puzzle} disabled={waiting} onSwitch={switchPuzzle} />
           <Share
             sharing={state.sharing}
             disabled={waiting}
@@ -53,6 +70,10 @@ export function TutorPage({ snapshotId }: { snapshotId?: string }) {
         <div className="tutor-body">
           <div className="tutor-stage">
             <CubeView
+              // A fresh CubeView per Puzzle, so its model is built with the
+              // right per-Piece layout (the 3x3 grid or the true 2x2x2).
+              key={session.puzzle}
+              puzzle={session.puzzle}
               queue={tutor.queue}
               selected={state.selected}
               onSelect={(sticker) => tutor.select(sticker)}

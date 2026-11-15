@@ -2,7 +2,20 @@
 // any, with the position Playback has reached in it. It is the state that is
 // saved and shared; what is on screen right now (the selection, a hint, the
 // animation in progress) lives in Tutor.
-import { Cube, formatMoves, inverse, invert, isRotation, parseMoves, type Move } from '../cube/index.ts'
+import {
+  Cube,
+  DEFAULT_PUZZLE,
+  formatMoves,
+  inverse,
+  invert,
+  isPuzzle,
+  isRotation,
+  parseMoves,
+  puzzleFromWireType,
+  puzzleWireType,
+  type Move,
+  type Puzzle,
+} from '../cube/index.ts'
 import { insertRotation, readSolution, stageStarts, writeSolution, type Solution } from './solution.ts'
 import { teachingAt, type Teaching } from './teaching.ts'
 
@@ -11,6 +24,12 @@ import { teachingAt, type Teaching } from './teaching.ts'
 // update them in the methods that change them; #with carries every other
 // field forward unchanged.
 interface Fields {
+  /**
+   * Which Puzzle the Session solves: the 3x3 ('cube') or the Pocket Cube
+   * ('pocket'). A Pocket Cube evolves its Cube with corner-only Moves
+   * (Cube.applyPocket), so its Phantom Stickers stay solved (ADR 0005).
+   */
+  readonly puzzle: Puzzle
   /** The Turns applied to a solved Cube to start the Session. */
   readonly scramble: readonly Move[]
   /** Every Move made since the Scramble, oldest first. It is the undo stack: undo takes its last Move off. */
@@ -65,18 +84,21 @@ interface LoadedSolution {
  * Fields or changes how it is saved: data saved in any other version is
  * outdated, and restoring it starts a new Session instead.
  */
-const SAVED_VERSION = 4
+const SAVED_VERSION = 5
 
 /** A Session as plain data, ready for JSON: the format saved in browser storage. */
 export type SavedSession = { readonly version: number } & { readonly [K in keyof Fields]: unknown }
 
 /**
  * A Snapshot as the server's API takes and returns it: the frozen copy of a
- * Session that a share link opens, with its Moves in standard notation.
+ * Session that a share link opens, with its Moves in standard notation and
+ * its puzzle type. type is '3x3' or '2x2' on the wire; a missing one reads as
+ * the 3x3, so every share link saved before 2x2 support still opens (ADR 0005).
  */
 export interface Snapshot {
   readonly scramble: string
   readonly moves: string
+  readonly type?: string
 }
 
 /** How one field is saved as plain data, and read back. read throws on data it can't read. */
@@ -91,6 +113,15 @@ const moves: Codec<readonly Move[]> = {
   read: (data) => {
     if (typeof data !== 'string') throw new TypeError('Moves are saved as notation')
     return parseMoves(data)
+  },
+}
+
+/** The Puzzle is saved as its name, 'cube' or 'pocket'. */
+const puzzle: Codec<Puzzle> = {
+  write: (value) => value,
+  read: (data) => {
+    if (!isPuzzle(data)) throw new TypeError('the Puzzle is saved as "cube" or "pocket"')
+    return data
   },
 }
 
@@ -140,6 +171,7 @@ const snapshotId: Codec<Fields['snapshotId']> = {
 // One codec per field. The type requires every field to have one, so a new
 // field can't be left out of what is saved.
 const CODECS: { readonly [K in keyof Fields]: Codec<Fields[K]> } = {
+  puzzle,
   scramble: moves,
   history: moves,
   undone: moves,
@@ -164,11 +196,15 @@ export class Session {
     this.cube = cube
   }
 
-  /** A new Session that starts by applying a Scramble to a solved Cube. */
-  static start(scramble: readonly Move[] = []): Session {
+  /**
+   * A new Session that starts by applying a Scramble to a solved Cube. The
+   * Puzzle is the 3x3 unless a Pocket Cube is asked for, in which case the
+   * Scramble and every Move after it are applied corner-only.
+   */
+  static start(scramble: readonly Move[] = [], puzzle: Puzzle = DEFAULT_PUZZLE): Session {
     return new Session(
-      { scramble, history: [], undone: [], solution: undefined, snapshotId: undefined },
-      Cube.solved().apply(scramble),
+      { puzzle, scramble, history: [], undone: [], solution: undefined, snapshotId: undefined },
+      applyFor(puzzle, Cube.solved(), scramble),
     )
   }
 
@@ -187,9 +223,11 @@ export class Session {
       return undefined
     }
     const restored = fields as Fields
-    // The Cube on screen, worked out from the fields as the class comment describes.
+    // The Cube on screen, worked out from the fields as the class comment
+    // describes, with the puzzle's own Moves (corner-only for a Pocket Cube).
     const played = restored.solution?.solution.moves.slice(0, restored.solution.position) ?? []
-    return new Session(restored, Cube.solved().apply(restored.scramble).apply(restored.history).apply(played))
+    const cube = applyFor(restored.puzzle, Cube.solved(), [...restored.scramble, ...restored.history, ...played])
+    return new Session(restored, cube)
   }
 
   /**
@@ -199,9 +237,9 @@ export class Session {
    * Throws a ParseError if the notation is invalid.
    */
   static fromSnapshot(snapshot: Snapshot, id?: string): Session {
-    const start = Session.start(parseMoves(snapshot.scramble))
+    const start = Session.start(parseMoves(snapshot.scramble), puzzleFromWireType(snapshot.type))
     const history = parseMoves(snapshot.moves)
-    return start.#with({ history, snapshotId: id }, start.cube.apply(history))
+    return start.#with({ history, snapshotId: id }, start.#apply(start.cube, history))
   }
 
   /**
@@ -237,6 +275,11 @@ export class Session {
     const saved: Record<string, unknown> = { version: SAVED_VERSION }
     for (const name of FIELD_NAMES) saved[name] = write(name, fields)
     return saved as SavedSession
+  }
+
+  /** Which Puzzle the Session solves: the 3x3 ('cube') or the Pocket Cube ('pocket'). */
+  get puzzle(): Puzzle {
+    return this.#fields.puzzle
   }
 
   get scramble(): readonly Move[] {
@@ -361,7 +404,7 @@ export class Session {
    */
   move(move: Move): Session {
     const loaded = this.#fresh
-    const cube = this.cube.apply([move])
+    const cube = this.#apply(this.cube, [move])
     if (loaded !== undefined && !isRotation(move)) {
       const s = this.closeSolution()
       const stale = { ...loaded, position: 0, direction: undefined, stale: true }
@@ -384,7 +427,10 @@ export class Session {
     if (this.#fresh !== undefined) return this.stepBack()
     const last = this.history.at(-1)
     if (last === undefined) return this
-    return this.#with({ history: this.history.slice(0, -1), undone: [...this.undone, last] }, this.cube.apply([inverse(last)]))
+    return this.#with(
+      { history: this.history.slice(0, -1), undone: [...this.undone, last] },
+      this.#apply(this.cube, [inverse(last)]),
+    )
   }
 
   /**
@@ -396,7 +442,10 @@ export class Session {
     if (this.#fresh !== undefined) return this.stepForward()
     const next = this.undone.at(-1)
     if (next === undefined) return this
-    return this.#with({ history: [...this.history, next], undone: this.undone.slice(0, -1) }, this.cube.apply([next]))
+    return this.#with(
+      { history: [...this.history, next], undone: this.undone.slice(0, -1) },
+      this.#apply(this.cube, [next]),
+    )
   }
 
   /**
@@ -535,9 +584,16 @@ export class Session {
     const { moves } = loaded.solution
     const cube =
       position >= loaded.position
-        ? this.cube.apply(moves.slice(loaded.position, position))
-        : this.cube.apply(invert(moves.slice(position, loaded.position)))
+        ? this.#apply(this.cube, moves.slice(loaded.position, position))
+        : this.#apply(this.cube, invert(moves.slice(position, loaded.position)))
     return this.#with({ solution: { ...loaded, position, direction } }, cube)
+  }
+
+  // Applies Moves to a Cube the way this Session's Puzzle does: corner-only
+  // for a Pocket Cube, so its Phantom Stickers stay solved, and the full 3x3
+  // permutation otherwise.
+  #apply(cube: Cube, moves: readonly Move[]): Cube {
+    return applyFor(this.#fields.puzzle, cube, moves)
   }
 
   // The loaded Solution, if Playback can play it: it isn't stale.
@@ -562,12 +618,25 @@ export class Session {
 function snapshotOf(fields: Fields): Snapshot {
   const loaded = fields.solution
   const played = loaded === undefined ? [] : loaded.solution.moves.slice(0, loaded.position)
-  return { scramble: formatMoves(fields.scramble), moves: formatMoves([...fields.history, ...played]) }
+  return {
+    scramble: formatMoves(fields.scramble),
+    moves: formatMoves([...fields.history, ...played]),
+    type: puzzleWireType(fields.puzzle),
+  }
 }
 
 function sameSnapshot(a: Fields, b: Fields): boolean {
   const [x, y] = [snapshotOf(a), snapshotOf(b)]
-  return x.scramble === y.scramble && x.moves === y.moves
+  return x.scramble === y.scramble && x.moves === y.moves && x.type === y.type
+}
+
+/**
+ * Applies Moves to a Cube the way a Puzzle does: a Pocket Cube evolves
+ * corner-only (Cube.applyPocket), so its Phantom Stickers stay solved, and the
+ * 3x3 uses the full permutation.
+ */
+function applyFor(puzzle: Puzzle, cube: Cube, moves: readonly Move[]): Cube {
+  return puzzle === 'pocket' ? cube.applyPocket(moves) : cube.apply(moves)
 }
 
 function write<K extends keyof Fields>(name: K, fields: Fields): unknown {

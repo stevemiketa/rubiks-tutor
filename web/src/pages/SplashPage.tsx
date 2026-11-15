@@ -12,6 +12,13 @@ const rise = (from: number, delay = 0) => ({
   transition: { duration: 0.7, delay, ease: 'easeOut' },
 } as const)
 
+// The Puzzles the splash picker offers, each a way into the tutor: the 3x3 at
+// /app and the Pocket Cube at /app/2x2.
+const PICKS: readonly { to: string; label: string }[] = [
+  { to: '/app', label: 'Solve the 3×3' },
+  { to: '/app/2x2', label: 'Solve the 2×2' },
+]
+
 // The splash page: the name, the Cube solving itself over a slowly moving
 // gradient, and the way into the tutor. It makes no server calls; the Cube
 // starts scrambled and plays a recorded Solution, then fades back to the
@@ -35,15 +42,19 @@ export function SplashPage() {
           <h1>Cubular</h1>
           <p>Learn to solve the Cube one Stage at a time.</p>
         </motion.header>
-        <motion.div
-          className="splash-start"
-          {...rise(24, 0.35)}
-          whileHover={{ scale: 1.05, transition: { duration: 0.15 } }}
-          whileTap={{ scale: 0.97, transition: { duration: 0.1 } }}
-        >
-          <Link className="button" to="/app">
-            Start solving
-          </Link>
+        {/* A Puzzle picker: each CTA starts the tutor on its Puzzle. */}
+        <motion.div className="splash-start" {...rise(24, 0.35)} role="group" aria-label="Pick a Puzzle to solve">
+          {PICKS.map(({ to, label }) => (
+            <motion.span
+              key={to}
+              whileHover={{ scale: 1.05, transition: { duration: 0.15 } }}
+              whileTap={{ scale: 0.97, transition: { duration: 0.1 } }}
+            >
+              <Link className="button" to={to}>
+                {label}
+              </Link>
+            </motion.span>
+          ))}
         </motion.div>
       </motion.main>
     </MotionConfig>

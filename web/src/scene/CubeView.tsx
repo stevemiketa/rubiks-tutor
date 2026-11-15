@@ -4,7 +4,7 @@
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { moveAxis, type Move, type Sticker } from '../cube/index.ts'
+import { DEFAULT_PUZZLE, moveAxis, type Move, type Puzzle, type Sticker } from '../cube/index.ts'
 import { QUARTER_TURN_MS, snapRotations, type MoveQueue, type QueuedMove } from '../session/index.ts'
 import { useTheme } from '../theme/useTheme.ts'
 import { CubeModel } from './cubeModel.ts'
@@ -38,6 +38,12 @@ export interface CubeViewProps {
   /** A text description of the view, for screen readers. */
   readonly label: string
   readonly className?: string
+  /**
+   * Which Puzzle to draw: the 3x3 ('cube', the default) or the Pocket Cube
+   * ('pocket'), a true 2x2x2. It only changes how the Pieces are laid out, not
+   * how the Cube is shown or animated.
+   */
+  readonly puzzle?: Puzzle
 }
 
 /** The 3D Cube, or an explanation in its place when the browser can't render WebGL. */
@@ -49,7 +55,7 @@ export function CubeView(props: CubeViewProps) {
   )
 }
 
-function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, highlighted, label, className }: CubeViewProps) {
+function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, highlighted, label, className, puzzle }: CubeViewProps) {
   const classes = ['cube-view', onRotate && 'draggable', className].filter(Boolean).join(' ')
   return (
     <div className={classes} role="img" aria-label={label}>
@@ -65,13 +71,17 @@ function CubeCanvas({ queue, selected, onSelect, selectable, onRotate, highlight
           selectable={selectable}
           onRotate={onRotate}
           highlighted={highlighted}
+          puzzle={puzzle}
         />
       </Canvas>
     </div>
   )
 }
 
-type AnimatedCubeProps = Pick<CubeViewProps, 'queue' | 'selected' | 'onSelect' | 'selectable' | 'onRotate' | 'highlighted'>
+type AnimatedCubeProps = Pick<
+  CubeViewProps,
+  'queue' | 'selected' | 'onSelect' | 'selectable' | 'onRotate' | 'highlighted' | 'puzzle'
+>
 
 /**
  * The page's background, the color behind the Cube: the canvas is transparent.
@@ -94,9 +104,11 @@ function quaternionOf(move: Move): THREE.Quaternion {
   return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(x, y, z), (-move.amount * Math.PI) / 2)
 }
 
-function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted }: AnimatedCubeProps) {
+function AnimatedCube({ queue, selected, onSelect, selectable, onRotate, highlighted, puzzle = DEFAULT_PUZZLE }: AnimatedCubeProps) {
   const theme = useTheme()
-  const model = useMemo(() => new CubeModel(pageBackground(), theme), [])
+  // The model is built once; a puzzle change would mount a fresh CubeView (the
+  // tutor remounts on a new puzzle), so the layout is fixed for its lifetime.
+  const model = useMemo(() => new CubeModel(pageBackground(), theme, puzzle), [])
   // Turns the whole Cube while it is dragged and as it settles square-on.
   // The Moves it shows are in the model, so between drags it is at rest.
   const dragGroup = useMemo(() => new THREE.Group(), [])

@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import type { Puzzle } from '../cube/index.ts'
 import { prefersReducedMotion } from '../scene/usePrefersReducedMotion.ts'
 import { canRenderWebGL } from '../scene/webgl.tsx'
 import { SessionStore, Tutor, browserStorage, type TutorState } from '../session/index.ts'
@@ -12,15 +13,18 @@ import { SessionStore, Tutor, browserStorage, type TutorState } from '../session
  * on a focused button, which it then doesn't press. It restores the Session
  * saved in browser storage, or starts a new one, and saves the Session after
  * every change. Opened from a share link, it opens that link's Snapshot
- * instead; snapshotId is read only when the page first appears.
+ * instead; snapshotId is read only when the page first appears. puzzle is the
+ * Puzzle a new Session solves (the 3x3 unless the route asks for the Pocket
+ * Cube); a saved Session or a Snapshot keeps its own.
  */
-export function useTutor(snapshotId?: string): { tutor: Tutor; state: TutorState } {
+export function useTutor(snapshotId?: string, puzzle?: Puzzle): { tutor: Tutor; state: TutorState } {
   // StrictMode calls this twice in development and keeps the first Tutor. The
   // second finds the Session the first saved, or loads the same Snapshot, so
   // the two agree.
   const [tutor] = useState(() =>
     Tutor.open(
       {
+        puzzle,
         store: new SessionStore(browserStorage()),
         // Without WebGL nothing animates the queue, so the Scramble is applied
         // at once, and so is every Move after it.

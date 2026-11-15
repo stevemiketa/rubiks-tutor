@@ -1,8 +1,20 @@
 // A still picture of the Cube: its top, front and right faces drawn as SVG
 // from the cube model, framed as the 3D view's camera frames them. It needs
 // no WebGL and never moves, so the splash page shows it under reduced motion.
-import { FACES, SLOTS, faceNormal, stickerFace, type Cube, type Face, type Sticker, type Vec } from '../cube/index.ts'
+import {
+  DEFAULT_PUZZLE,
+  FACES,
+  SLOTS,
+  faceNormal,
+  stickerFace,
+  type Cube,
+  type Face,
+  type Puzzle,
+  type Sticker,
+  type Vec,
+} from '../cube/index.ts'
 import { CAMERA, PAINT, PLASTIC, STICKER_SIZE } from './look.ts'
+import { pieceLayout } from './pieceLayout.ts'
 
 type Point = readonly [number, number]
 
@@ -41,9 +53,26 @@ function square(c: Vec, normal: Vec, size: number): string {
 const SHADE: Partial<Record<Face, number>> = { U: 0, F: 0.12, R: 0.26 }
 const VISIBLE = FACES.filter((f) => dot(faceNormal(f), add(EYE, scale(faceNormal(f), -1.5))) > 0)
 
-// The Pieces sit on a grid of unit spacing, so each face is 3 wide.
-const FACE_SHAPES = VISIBLE.map((face) => ({ face, points: square(scale(faceNormal(face), 1.5), faceNormal(face), 2.96) }))
-const STICKER_SHAPES: readonly { sticker: Sticker; points: string }[] = SLOTS.flatMap((slot) =>
+// The 3x3 reference Piece size, the one the layout's sizes are measured in.
+const PIECE_SIZE = 0.95
+
+interface FaceShape {
+  readonly face: Face
+  readonly points: string
+}
+interface StickerShape {
+  readonly sticker: Sticker
+  readonly points: string
+}
+
+// The 3x3 draws its Pieces on a grid of unit spacing, so each face is 3 wide,
+// trimmed a little to leave an edge; its Sticker sits half a cell proud of the
+// Piece centre. Kept as it was so the picture is unchanged.
+const CUBE_FACE_SHAPES: readonly FaceShape[] = VISIBLE.map((face) => ({
+  face,
+  points: square(scale(faceNormal(face), 1.5), faceNormal(face), 2.96),
+}))
+const CUBE_STICKER_SHAPES: readonly StickerShape[] = SLOTS.flatMap((slot) =>
   slot.stickers
     .filter((s) => VISIBLE.includes(stickerFace(s)))
     .map((sticker) => {
@@ -52,19 +81,65 @@ const STICKER_SHAPES: readonly { sticker: Sticker; points: string }[] = SLOTS.fl
     }),
 )
 
+// The Pocket Cube draws only its eight enlarged corner Pieces, each at its
+// layout centre and size, so the picture shows the same true 2x2x2 as the 3D
+// view (see pieceLayout). The outer surface of a corner is its half-size proud
+// of its centre, which sets where each 2-wide face sits and how big it is.
+function pocketShapes(): { faces: readonly FaceShape[]; stickers: readonly StickerShape[] } {
+  const layout = pieceLayout('pocket')
+  const visible = SLOTS.filter((slot) => layout.get(slot.name)?.visible)
+  // A corner's outer surface, along the axis it faces: its centre plus half
+  // its size. Every corner is the same size, so one reaches for all.
+  const surface = visible.length === 0 ? 1.5 : Math.abs(layout.get(visible[0]!.name)!.position[0]) + layout.get(visible[0]!.name)!.size / 2
+  const faces = VISIBLE.map((face) => ({
+    face,
+    // The 2x2 face is 2 corners wide; trim it as the 3x3's 2.96/3 does.
+    points: square(scale(faceNormal(face), surface), faceNormal(face), (2 * surface * 2.96) / 3),
+  }))
+  const stickers = visible.flatMap((slot) => {
+    const placement = layout.get(slot.name)!
+    const factor = placement.size / PIECE_SIZE
+    return slot.stickers
+      .filter((s) => VISIBLE.includes(stickerFace(s)))
+      .map((sticker) => {
+        const normal = faceNormal(stickerFace(sticker))
+        const centre = add(placement.position, scale(normal, placement.size / 2))
+        return { sticker, points: square(centre, normal, STICKER_SIZE * factor) }
+      })
+  })
+  return { faces, stickers }
+}
+
+const POCKET = pocketShapes()
+
+function shapesFor(puzzle: Puzzle): { faces: readonly FaceShape[]; stickers: readonly StickerShape[] } {
+  return puzzle === 'pocket' ? POCKET : { faces: CUBE_FACE_SHAPES, stickers: CUBE_STICKER_SHAPES }
+}
+
 /** The Cube as a still picture, the same size and from the same angle as CubeView shows it. */
-export function CubePicture({ cube, label, className }: { cube: Cube; label: string; className?: string }) {
+export function CubePicture({
+  cube,
+  label,
+  className,
+  puzzle = DEFAULT_PUZZLE,
+}: {
+  cube: Cube
+  label: string
+  className?: string
+  puzzle?: Puzzle
+}) {
+  const { faces, stickers } = shapesFor(puzzle)
   return (
     <div className={['cube-view', 'cube-picture', className].filter(Boolean).join(' ')} role="img" aria-label={label}>
       <svg viewBox="-1 -1 2 2" aria-hidden="true">
-        {FACE_SHAPES.map(({ face, points }) => (
+        {faces.map(({ face, points }) => (
           <polygon key={face} points={points} fill={PLASTIC} stroke={PLASTIC} strokeWidth={0.03} strokeLinejoin="round" />
         ))}
-        {STICKER_SHAPES.map(({ sticker, points }) => {
+        {stickers.map(({ sticker, points }) => {
           const paint = PAINT[cube.at(sticker)]
           return <polygon key={sticker} points={points} fill={paint} stroke={paint} strokeWidth={0.008} strokeLinejoin="round" />
         })}
-        {FACE_SHAPES.map(({ face, points }) => (
+        {faces.map(({ face, points }) => (
           <polygon key={face} points={points} fill="#000" fillOpacity={SHADE[face] ?? 0} />
         ))}
       </svg>

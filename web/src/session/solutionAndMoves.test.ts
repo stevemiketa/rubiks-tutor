@@ -484,7 +484,8 @@ describe('saving a loaded Solution in browser storage', () => {
     new SessionStore(storage).save(Session.start(parseMoves('R U')).loadSolution(solution).stepForward().setSpeed(4))
 
     expect(JSON.parse([...storage.items.values()][0] ?? '')).toEqual({
-      version: 4,
+      version: 5,
+      puzzle: 'cube',
       scramble: 'R U',
       history: '',
       undone: '',
@@ -494,7 +495,7 @@ describe('saving a loaded Solution in browser storage', () => {
   })
 
   const saved = (solution: unknown): string =>
-    JSON.stringify({ version: 4, scramble: 'R U', history: '', undone: '', solution, snapshotId: null })
+    JSON.stringify({ version: 5, puzzle: 'cube', scramble: 'R U', history: '', undone: '', solution, snapshotId: null })
   const stage = { id: 'white-cross', name: 'W', goal: 'g', moves: "U' R'", notes: [], algorithms: [], pieces: [] }
   const good = { stages: [stage], position: 1, speed: 1, autoPause: true, stale: false }
 
@@ -530,7 +531,7 @@ describe('sharing while a Solution is loaded', () => {
   it('makes a Snapshot whose Move history includes the Solution Moves played so far, rotations too', () => {
     const session = steps(steps(loaded('M'), 2).move(move('y')), 2)
 
-    expect(session.toSnapshot()).toEqual({ scramble: recordedScramble, moves: "M U R2 y L' F2" })
+    expect(session.toSnapshot()).toEqual({ scramble: recordedScramble, moves: "M U R2 y L' F2", type: '3x3' })
   })
 
   it('never includes the Solution: the Snapshot opens with the same Cube and none loaded', () => {
@@ -546,7 +547,7 @@ describe('sharing while a Solution is loaded', () => {
   it('shares a stale Solution’s Moves played once, from the Move history', () => {
     const stale = steps(loaded(), 2).move(move('F'))
 
-    expect(stale.toSnapshot()).toEqual({ scramble: recordedScramble, moves: 'U R2 F' })
+    expect(stale.toSnapshot()).toEqual({ scramble: recordedScramble, moves: 'U R2 F', type: '3x3' })
   })
 })
 

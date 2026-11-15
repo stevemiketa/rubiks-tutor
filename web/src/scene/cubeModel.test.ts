@@ -97,3 +97,52 @@ describe('CubeModel', () => {
     for (const [id, mesh] of after) expect(mesh.at.distanceTo(before.get(id)!.at)).toBeLessThan(1e-9)
   })
 })
+
+// The eight corner Slots, and whether an Object3D is shown (it and every
+// ancestor visible).
+const CORNERS = SLOTS.filter((slot) => slot.position.every((n) => n !== 0)).map((slot) => slot.name)
+const shown = (object: THREE.Object3D): boolean => {
+  for (let o: THREE.Object3D | null = object; o; o = o.parent) if (!o.visible) return false
+  return true
+}
+
+describe('CubeModel for the Pocket Cube', () => {
+  function pocket(): CubeModel {
+    const model = new CubeModel(DARK, 'dark', 'pocket')
+    model.show(Cube.solved())
+    model.updateMatrixWorld(true)
+    return model
+  }
+
+  it('draws the eight corner Pieces and hides the eighteen others', () => {
+    const model = pocket()
+    for (const slot of SLOTS) {
+      const piece = model.getObjectByName(slot.name)!
+      expect(shown(piece), slot.name).toBe(CORNERS.includes(slot.name))
+    }
+  })
+
+  it('enlarges the corner Pieces beyond the 3x3 and pulls them in to meet at the centre', () => {
+    const pocketModel = pocket()
+    const cubeModel = new CubeModel(DARK, 'dark')
+    cubeModel.show(Cube.solved())
+    cubeModel.updateMatrixWorld(true)
+
+    for (const name of CORNERS) {
+      const scale = (m: CubeModel): number => m.getObjectByName(name)!.getWorldScale(new THREE.Vector3()).x
+      expect(scale(pocketModel)).toBeGreaterThan(scale(cubeModel))
+      const centre = (m: CubeModel): number => m.getObjectByName(name)!.getWorldPosition(new THREE.Vector3()).length()
+      expect(centre(pocketModel)).toBeLessThan(centre(cubeModel))
+    }
+  })
+
+  it('shows the 24 corner Stickers and no others', () => {
+    const model = pocket()
+    const stickerMeshes: THREE.Mesh[] = []
+    model.traverse((o) => {
+      if (o instanceof THREE.Mesh && CubeModel.stickerOf(o) !== undefined) stickerMeshes.push(o)
+    })
+    expect(stickerMeshes).toHaveLength(54) // All 54 exist...
+    expect(stickerMeshes.filter(shown)).toHaveLength(24) // ...but only the corners' 24 show.
+  })
+})

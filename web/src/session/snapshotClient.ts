@@ -1,5 +1,6 @@
 // Sharing through the server: POST /api/snapshots saves a Snapshot, and
 // GET /api/snapshots/{id} opens one.
+import { puzzleFromWireType, puzzleWireType } from '../cube/index.ts'
 import type { Snapshot } from './session.ts'
 import type { SharedSnapshot, SnapshotClient } from './sharing.ts'
 
@@ -9,7 +10,12 @@ export const snapshotApi: SnapshotClient = {
     const response = await call('/api/snapshots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scramble: snapshot.scramble, moves: snapshot.moves }),
+      // type is '3x3' or '2x2' on the wire; a missing one is the 3x3 (ADR 0005).
+      body: JSON.stringify({
+        scramble: snapshot.scramble,
+        moves: snapshot.moves,
+        type: puzzleWireType(puzzleFromWireType(snapshot.type)),
+      }),
     })
     if (response.status === 429) throw new Error(tooManyShares(response.headers.get('Retry-After')))
     if (!response.ok) throw new Error(`The Snapshot couldn’t be saved (error ${response.status}). Try again.`)
@@ -22,9 +28,10 @@ export const snapshotApi: SnapshotClient = {
     const response = await call(`/api/snapshots/${encodeURIComponent(id)}`)
     if (response.status === 404) return undefined
     if (!response.ok) throw new Error(`The Snapshot couldn’t be loaded (error ${response.status}).`)
-    const { scramble, moves } = (await response.json()) as Partial<Record<string, unknown>>
+    const { scramble, moves, type } = (await response.json()) as Partial<Record<string, unknown>>
     if (typeof scramble !== 'string' || typeof moves !== 'string') throw new Error(unexpected)
-    return { scramble, moves }
+    // A Snapshot saved before 2x2 support has no type: it reads as the 3x3.
+    return { scramble, moves, type: puzzleWireType(puzzleFromWireType(type)) }
   },
 }
 

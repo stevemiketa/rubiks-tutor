@@ -1,8 +1,16 @@
 // The Session lifecycle in the Tutor: a new Session plays its Scramble, "New
 // scramble" starts over, and the Session survives a reload.
 import { describe, expect, it } from 'vitest'
-import { formatMoves, parseMoves, stickerAt } from '../cube/index.ts'
+import { Cube, formatMoves, parseMoves, stickerAt } from '../cube/index.ts'
 import { SessionStore, Tutor, type MoveQueue, type StorageLike } from './index.ts'
+
+// The non-corner Stickers of a cube state: the edges and centers, which a
+// Pocket Cube leaves solved.
+const phantomsOf = (state: string): string =>
+  state
+    .split(' ')
+    .map((face) => [...face].filter((_, i) => ![0, 2, 6, 8].includes(i)).join(''))
+    .join(' ')
 
 // Plays the queue the way the scene does, until nothing is left. Returns how
 // long it took, in ms.
@@ -281,6 +289,48 @@ describe('Tutor saving the Session', () => {
     tutor.select(frontCenter)
     tutor.press({ key: 'ArrowUp' })
     expect(formatMoves(tutor.getState().session.history)).toBe("M'")
+  })
+
+  it('starts a Pocket Cube Session with a corner-only Scramble when the puzzle is a Pocket Cube', () => {
+    const tutor = Tutor.open({ puzzle: 'pocket', store: new SessionStore(undefined) })
+    const { session } = tutor.getState()
+
+    expect(session.puzzle).toBe('pocket')
+    // The Scramble is corner-only: every Turn is an outer face, no middles.
+    expect(session.scramble.every((m) => 'RLUDFB'.includes(m.letter))).toBe(true)
+    // It leaves the Phantom Stickers solved.
+    expect(phantomsOf(session.cube.toString())).toBe(phantomsOf(Cube.solved().toString()))
+
+    playAll(tutor.queue)
+    // The scene ends up showing the Session's own Cube.
+    expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
+  })
+
+  it('switches to another Puzzle with newPuzzle, starting a fresh Session of it', () => {
+    const tutor = Tutor.open({ store: new SessionStore(undefined) })
+    playAll(tutor.queue)
+    expect(tutor.getState().session.puzzle).toBe('cube')
+
+    tutor.newPuzzle('pocket')
+    const { session } = tutor.getState()
+
+    expect(session.puzzle).toBe('pocket')
+    expect(session.history).toEqual([])
+    expect(session.scramble.every((m) => 'RLUDFB'.includes(m.letter))).toBe(true)
+    playAll(tutor.queue)
+    expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
+    expect(phantomsOf(tutor.queue.shown.toString())).toBe(phantomsOf(Cube.solved().toString()))
+  })
+
+  it('treats newPuzzle of the same Puzzle as a new Scramble, confirming first when Moves were made', () => {
+    const tutor = Tutor.open({ store: new SessionStore(undefined) })
+    playAll(tutor.queue)
+    tutor.select(frontCenter)
+    tutor.press({ key: 'ArrowUp' }) // A Move, so a new Scramble needs confirming.
+
+    tutor.newPuzzle('cube')
+
+    expect(tutor.getState().confirming).toBe('new-scramble')
   })
 })
 
