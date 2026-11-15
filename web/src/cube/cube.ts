@@ -4,6 +4,7 @@ import {
   COLOR_LETTERS,
   FACES,
   SOLVED_COLORS,
+  cornerMovePerm,
   movePerm,
   permute,
   type Color,
@@ -63,6 +64,20 @@ export class Cube {
   apply(moves: readonly Move[]): Cube {
     let stickers = this.#stickers
     for (const move of moves) stickers = permute(stickers, movePerm(move))
+    return new Cube(stickers)
+  }
+
+  /**
+   * The Cube after the Moves, in order, applied with corner-only (2x2 Pocket
+   * Cube) semantics: each Move permutes only the 24 corner Stickers and leaves
+   * the 30 Phantom Stickers (edges and centers) frozen. A Move's corner
+   * permutation is exactly its 3x3 permutation, so the 2x2 shares the 3x3
+   * engine (ADR 0005). Only the face Turns R L U D F B and their primes and
+   * doubles make sense for a 2x2.
+   */
+  applyPocket(moves: readonly Move[]): Cube {
+    let stickers = this.#stickers
+    for (const move of moves) stickers = permute(stickers, cornerMovePerm(move))
     return new Cube(stickers)
   }
 

@@ -26,12 +26,16 @@ const (
 	everyMove = "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2 " +
 		"M M' M2 E E' E2 S S' S2 x x' x2 y y' y2 z z' z2"
 	everyRotation = "x x' x2 y y' y2 z z' z2"
+	// everyFaceTurn is the Moves a 2x2 Pocket Cube has: the six outer-Layer
+	// Turns, each with its prime and double. No middle Layers or rotations.
+	everyFaceTurn = "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2"
 )
 
 // runners maps each case-file kind to the function that checks its cases.
 var runners = map[string]func(t *testing.T, data []byte){
 	"notation":     runNotationCases,
 	"moves":        runMoveCases,
+	"moves-2x2":    runMoves2x2Cases,
 	"inverse":      runInverseCases,
 	"equivalences": runEquivalenceCases,
 	"relabel":      runRelabelCases,
@@ -201,6 +205,15 @@ type moveCase struct {
 	Solved bool   `json:"solved"`
 }
 
+type moves2x2Case struct {
+	Name           string `json:"name"`
+	Start          string `json:"start"`
+	Moves          string `json:"moves"`
+	Expect         string `json:"expect"`
+	Solved         bool   `json:"solved"`
+	PhantomsSolved bool   `json:"phantomsSolved"`
+}
+
 func runMoveCases(t *testing.T, data []byte) {
 	var file struct {
 		Kind        string     `json:"kind"`
@@ -226,6 +239,61 @@ func runMoveCases(t *testing.T, data []byte) {
 		}
 		if got.IsSolved() != c.Solved {
 			t.Errorf("IsSolved() = %v after %q; want %v", got.IsSolved(), c.Moves, c.Solved)
+		}
+	})
+}
+
+// cornerPositions are the four positions on each face (face*9 + p) that hold a
+// corner Sticker. The other five positions hold Phantom Stickers: edges at 1,
+// 3, 5, 7 and the center at 4.
+var cornerPositions = map[int]bool{0: true, 2: true, 6: true, 8: true}
+
+// phantomsSolved reports whether every Phantom Sticker (edges and centers) in c
+// still holds its solved color: the 2x2 must never disturb them.
+func phantomsSolved(c cube.Cube) bool {
+	solved := cube.Solved()
+	for s := range cube.Sticker(54) {
+		if !cornerPositions[int(s)%9] && c[s] != solved[s] {
+			return false
+		}
+	}
+	return true
+}
+
+// runMoves2x2Cases checks the 2x2 Pocket Cube cases: each face Turn applied
+// corner-only from a solved Cube, asserting the resulting [54] state, that
+// IsSolved matches, and that every Phantom Sticker stays solved.
+func runMoves2x2Cases(t *testing.T, data []byte) {
+	var file struct {
+		Kind        string         `json:"kind"`
+		Description string         `json:"description"`
+		Cases       []moves2x2Case `json:"cases"`
+	}
+	decodeFile(t, data, &file, nil, []string{"moves", "expect", "solved", "phantomsSolved"})
+	fromSolved := map[string]bool{}
+	for _, c := range file.Cases {
+		if c.Start == "" {
+			fromSolved[c.Moves] = true
+		}
+	}
+	for _, m := range strings.Fields(everyFaceTurn) {
+		if !fromSolved[m] {
+			t.Errorf("no case applies %s alone to a solved 2x2", m)
+		}
+	}
+	eachCase(t, file.Cases, func(c moves2x2Case) string { return c.Name }, func(t *testing.T, c moves2x2Case) {
+		got := parseState(t, c.Start).ApplyPocket(parseMoves(t, c.Moves)...)
+		if want := parseState(t, c.Expect); got != want {
+			t.Errorf("after %q corner-only:\n got  %s\n want %s", c.Moves, got, want)
+		}
+		if got.IsSolved() != c.Solved {
+			t.Errorf("IsSolved() = %v after %q; want %v", got.IsSolved(), c.Moves, c.Solved)
+		}
+		if phantomsSolved(got) != c.PhantomsSolved {
+			t.Errorf("phantomsSolved() = %v after %q; want %v", phantomsSolved(got), c.Moves, c.PhantomsSolved)
+		}
+		if !phantomsSolved(got) {
+			t.Errorf("Phantom Stickers moved after %q corner-only:\n got %s", c.Moves, got)
 		}
 	})
 }

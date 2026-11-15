@@ -1,0 +1,146 @@
+{
+  "kind": "moves-2x2",
+  "description": "2x2 Pocket Cube Moves: each face Turn applied corner-only from a solved Cube (ADR 0005). Corner Stickers (f*9 + 0,2,6,8) permute exactly as on the 3x3; the 30 Phantom Stickers (edges and centers) stay frozen at their solved colors. Each case applies moves corner-only to start (a solved Cube when start is absent) and must produce expect. solved is whether the result is solved. phantomsSolved asserts every Phantom Sticker still holds its solved color. Corner states were derived from the independently verified 3x3 move results in moves.json by freezing the Phantom Stickers.",
+  "cases": [
+    {
+      "name": "no Moves leave the 2x2 solved",
+      "moves": "",
+      "expect": "WWWWWWWWW RRRRRRRRR GGGGGGGGG YYYYYYYYY OOOOOOOOO BBBBBBBBB",
+      "solved": true,
+      "phantomsSolved": true
+    },
+    {
+      "name": "R from 2x2-solved",
+      "moves": "R",
+      "expect": "WWGWWWWWG RRRRRRRRR GGYGGGGGY YYBYYYYYB OOOOOOOOO WBBBBBWBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "R' from 2x2-solved",
+      "moves": "R'",
+      "expect": "WWBWWWWWB RRRRRRRRR GGWGGGGGW YYGYYYYYG OOOOOOOOO YBBBBBYBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "R2 from 2x2-solved",
+      "moves": "R2",
+      "expect": "WWYWWWWWY RRRRRRRRR GGBGGGGGB YYWYYYYYW OOOOOOOOO GBBBBBGBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "L from 2x2-solved",
+      "moves": "L",
+      "expect": "BWWWWWBWW RRRRRRRRR WGGGGGWGG GYYYYYGYY OOOOOOOOO BBYBBBBBY",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "L' from 2x2-solved",
+      "moves": "L'",
+      "expect": "GWWWWWGWW RRRRRRRRR YGGGGGYGG BYYYYYBYY OOOOOOOOO BBWBBBBBW",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "L2 from 2x2-solved",
+      "moves": "L2",
+      "expect": "YWWWWWYWW RRRRRRRRR BGGGGGBGG WYYYYYWYY OOOOOOOOO BBGBBBBBG",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "U from 2x2-solved",
+      "moves": "U",
+      "expect": "WWWWWWWWW BRBRRRRRR RGRGGGGGG YYYYYYYYY GOGOOOOOO OBOBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "U' from 2x2-solved",
+      "moves": "U'",
+      "expect": "WWWWWWWWW GRGRRRRRR OGOGGGGGG YYYYYYYYY BOBOOOOOO RBRBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "U2 from 2x2-solved",
+      "moves": "U2",
+      "expect": "WWWWWWWWW ORORRRRRR BGBGGGGGG YYYYYYYYY ROROOOOOO GBGBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "D from 2x2-solved",
+      "moves": "D",
+      "expect": "WWWWWWWWW RRRRRRGRG GGGGGGOGO YYYYYYYYY OOOOOOBOB BBBBBBRBR",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "D' from 2x2-solved",
+      "moves": "D'",
+      "expect": "WWWWWWWWW RRRRRRBRB GGGGGGRGR YYYYYYYYY OOOOOOGOG BBBBBBOBO",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "D2 from 2x2-solved",
+      "moves": "D2",
+      "expect": "WWWWWWWWW RRRRRRORO GGGGGGBGB YYYYYYYYY OOOOOOROR BBBBBBGBG",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "F from 2x2-solved",
+      "moves": "F",
+      "expect": "WWWWWWOWO WRRRRRWRR GGGGGGGGG RYRYYYYYY OOYOOOOOY BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "F' from 2x2-solved",
+      "moves": "F'",
+      "expect": "WWWWWWRWR YRRRRRYRR GGGGGGGGG OYOYYYYYY OOWOOOOOW BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "F2 from 2x2-solved",
+      "moves": "F2",
+      "expect": "WWWWWWYWY ORRRRRORR GGGGGGGGG WYWYYYYYY OOROOOOOR BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "B from 2x2-solved",
+      "moves": "B",
+      "expect": "RWRWWWWWW RRYRRRRRY GGGGGGGGG YYYYYYOYO WOOOOOWOO BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "B' from 2x2-solved",
+      "moves": "B'",
+      "expect": "OWOWWWWWW RRWRRRRRW GGGGGGGGG YYYYYYRYR YOOOOOYOO BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "B2 from 2x2-solved",
+      "moves": "B2",
+      "expect": "YWYWWWWWW RRORRRRRO GGGGGGGGG YYYYYYWYW ROOOOOROO BBBBBBBBB",
+      "solved": false,
+      "phantomsSolved": true
+    },
+    {
+      "name": "(R U R' U') six times returns the 2x2 to solved",
+      "moves": "R U R' U' R U R' U' R U R' U' R U R' U' R U R' U' R U R' U'",
+      "expect": "WWWWWWWWW RRRRRRRRR GGGGGGGGG YYYYYYYYY OOOOOOOOO BBBBBBBBB",
+      "solved": true,
+      "phantomsSolved": true
+    }
+  ]
+}
