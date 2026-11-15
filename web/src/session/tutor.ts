@@ -145,7 +145,13 @@ export class Tutor {
       void tutor.openSnapshot(snapshotId)
       return tutor
     }
-    if (saved !== undefined) return new Tutor(saved, options)
+    // Restore the saved Session only when the route doesn't ask for a different
+    // Puzzle: a reload of /app or /app/2x2 keeps the work in progress, but
+    // explicitly picking the other Puzzle (such as "Solve the 2x2" over a saved
+    // 3x3) starts a fresh Session of it rather than restoring the old one.
+    if (saved !== undefined && (options.puzzle === undefined || saved.puzzle === options.puzzle)) {
+      return new Tutor(saved, options)
+    }
     // Seed the Tutor with the puzzle it will scramble, so its MoveQueue applies
     // the Scramble the same way the Session does (corner-only for a Pocket Cube).
     const tutor = new Tutor(Session.start([], options.puzzle ?? DEFAULT_PUZZLE), options)

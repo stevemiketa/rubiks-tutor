@@ -306,6 +306,19 @@ describe('Tutor saving the Session', () => {
     expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
   })
 
+  it('starts a fresh Pocket Cube Session when the route asks for it over a saved 3x3 Session', () => {
+    const storage = memoryStorage()
+    // A returning visitor left an in-progress 3x3 Session in storage.
+    const saved = Tutor.open({ store: new SessionStore(storage) })
+    expect(saved.getState().session.puzzle).toBe('cube')
+
+    // They pick "Solve the 2x2" on the splash: the route asks for the Pocket Cube.
+    const tutor = Tutor.open({ puzzle: 'pocket', store: new SessionStore(storage) })
+
+    // The sticker selector must show the 2x2 asked for, not the saved 3x3.
+    expect(tutor.getState().session.puzzle).toBe('pocket')
+  })
+
   it('switches to another Puzzle with newPuzzle, starting a fresh Session of it', () => {
     const tutor = Tutor.open({ store: new SessionStore(undefined) })
     playAll(tutor.queue)
