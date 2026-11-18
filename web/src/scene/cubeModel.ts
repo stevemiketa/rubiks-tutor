@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import {
   COLORS,
+  DEFAULT_PUZZLE,
   SLOTS,
   faceNormal,
   moveAxis,
@@ -12,11 +13,13 @@ import {
   type Color,
   type Cube,
   type Move,
+  type Puzzle,
   type Sticker,
   type Vec,
 } from '../cube/index.ts'
 import type { Theme } from '../theme/theme.ts'
 import { PAINT, PLASTIC, STICKER_SIZE } from './look.ts'
+import { pieceLayout, type PieceLayout } from './pieceLayout.ts'
 
 /**
  * How far a dimmed Piece's Stickers fade toward the Cube's background, in
@@ -78,6 +81,9 @@ export class CubeModel extends THREE.Group {
   readonly #layer = new THREE.Group()
   readonly #pieceBySlot = new Map<string, THREE.Group>()
   readonly #stickers: THREE.Mesh[] = []
+  // Where each Piece sits and how big it is, for the Puzzle drawn: the 3x3's
+  // unit grid, or the Pocket Cube's enlarged corners meeting at the centre.
+  readonly #layout: PieceLayout
   readonly #marker: THREE.Mesh
   readonly #paints: Readonly<Record<Color, THREE.Material>>
   readonly #dimPaints: Readonly<Record<Color, THREE.MeshStandardMaterial>>
@@ -87,10 +93,16 @@ export class CubeModel extends THREE.Group {
   readonly #disposables: { dispose(): void }[] = []
   #turn: { axis: THREE.Vector3; angle: number } | undefined
 
-  /** The Cube, with dimmed Pieces fading toward background, the color behind it in theme. */
-  constructor(background: THREE.ColorRepresentation, theme: Theme) {
+  /**
+   * The Cube, with dimmed Pieces fading toward background, the color behind it
+   * in theme. The Puzzle decides where each Piece sits and how big it is: the
+   * 3x3 draws all 26 on its unit grid; the Pocket Cube ('pocket') enlarges its
+   * eight corners into a true 2x2x2 and hides the rest (see pieceLayout).
+   */
+  constructor(background: THREE.ColorRepresentation, theme: Theme, puzzle: Puzzle = DEFAULT_PUZZLE) {
     super()
     this.name = 'Cube'
+    this.#layout = pieceLayout(puzzle)
 
     const body = new RoundedBoxGeometry(PIECE_SIZE, PIECE_SIZE, PIECE_SIZE, 3, 0.08)
     const plastic = new THREE.MeshStandardMaterial({ color: PLASTIC, roughness: 0.55 })
@@ -108,7 +120,13 @@ export class CubeModel extends THREE.Group {
     for (const slot of SLOTS) {
       const piece = new THREE.Group()
       piece.name = slot.name
-      piece.position.copy(toVector(slot.position))
+      // The body geometry is PIECE_SIZE; the whole Piece (body and Stickers)
+      // scales to the layout's size and sits at its centre, so the Pocket
+      // Cube's enlarged corners meet at the middle.
+      const placement = this.#placementOf(slot.name)
+      piece.position.copy(toVector(placement.position))
+      piece.scale.setScalar(placement.size / PIECE_SIZE)
+      piece.visible = placement.visible
       piece.add(new THREE.Mesh(body, plastic))
       this.#pieceBySlot.set(slot.name, piece)
       this.#pieces.add(piece)
@@ -196,9 +214,21 @@ export class CubeModel extends THREE.Group {
   select(sticker: Sticker | undefined): void {
     this.#marker.visible = sticker !== undefined
     if (sticker === undefined) return
+    // The marker sits on the Piece's face wherever the layout puts it and
+    // however big it is, so it fits an enlarged Pocket Cube corner too.
+    const placement = this.#placementOf(slotOf(sticker).name)
+    const factor = placement.size / PIECE_SIZE
     const normal = toVector(faceNormal(stickerFace(sticker)))
-    this.#marker.position.copy(toVector(slotOf(sticker).position)).addScaledVector(normal, MARKER_LIFT)
+    this.#marker.scale.setScalar(factor)
+    this.#marker.position.copy(toVector(placement.position)).addScaledVector(normal, MARKER_LIFT * factor)
     this.#marker.quaternion.setFromUnitVectors(FACING, normal)
+  }
+
+  // Where a Slot's Piece sits and how big it is, for the Puzzle drawn.
+  #placementOf(name: string): { size: number; position: Vec; visible: boolean } {
+    const placement = this.#layout.get(name)
+    if (placement === undefined) throw new RangeError(`no placement for Slot ${name}`)
+    return placement
   }
 
   /** Gathers the Pieces a Move turns into one group, ready to rotate. */

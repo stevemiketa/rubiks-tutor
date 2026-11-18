@@ -49,6 +49,67 @@ describe('Session', () => {
   })
 })
 
+// The non-corner Stickers of a cube state: on each face, the four corners are
+// indices 0, 2, 6, 8, so the rest are the edges and the center. A Pocket
+// Cube's Moves leave these Phantom Stickers solved.
+const phantomsOf = (state: string): string =>
+  state
+    .split(' ')
+    .map((face) => [...face].filter((_, i) => ![0, 2, 6, 8].includes(i)).join(''))
+    .join(' ')
+
+describe('Session puzzle', () => {
+  it('is a 3x3 by default', () => {
+    expect(Session.start().puzzle).toBe('cube')
+    expect(Session.start(parseMoves('R U')).puzzle).toBe('cube')
+  })
+
+  it('tracks the Pocket Cube when started as one', () => {
+    expect(Session.start(parseMoves('R U'), 'pocket').puzzle).toBe('pocket')
+  })
+
+  it('evolves a Pocket Cube with corner-only Moves, leaving the Phantom Stickers solved', () => {
+    const solved = Session.start().cube.toString()
+    const session = play(Session.start(parseMoves('R U'), 'pocket'), "F' R2")
+    expect(phantomsOf(session.cube.toString())).toBe(phantomsOf(solved))
+    // The corners still move: the Cube is not solved.
+    expect(session.isSolved()).toBe(false)
+  })
+
+  it('applies a Pocket Cube Scramble and its undo as corner-only Moves', () => {
+    const session = Session.start(parseMoves("R U F' L D"), 'pocket')
+    expect(play(session, "D' L' F U' R'").isSolved()).toBe(true)
+  })
+
+  it('stays solved when a Pocket Cube is rotated as a whole', () => {
+    // A whole-Cube rotation is rigid: it must move the Phantom centers with
+    // the corners, so a solved Pocket Cube reads as solved in any orientation.
+    expect(play(Session.start([], 'pocket'), 'x').isSolved()).toBe(true)
+    expect(play(Session.start([], 'pocket'), 'y x2 z').isSolved()).toBe(true)
+  })
+
+  it('returns a Pocket Cube to solved after a rotation and face Turns are undone', () => {
+    // A sequence may mix a whole-Cube rotation with face Turns; undoing the
+    // face Turns in reverse (the rotation stays) must reach solved again.
+    const session = play(Session.start([], 'pocket'), 'x R U')
+    expect(play(session, "U' R'").isSolved()).toBe(true)
+  })
+
+  it('leaves a 3x3 evolving with full Moves: the same Turns reach different states', () => {
+    const cube = play(Session.start(parseMoves('R U'), 'cube'), "F'").cube.toString()
+    const pocket = play(Session.start(parseMoves('R U'), 'pocket'), "F'").cube.toString()
+    expect(pocket).not.toBe(cube)
+  })
+
+  it('carries the puzzle through undo and redo', () => {
+    const session = play(Session.start(parseMoves('R'), 'pocket'), 'U').undo()
+    expect(session.puzzle).toBe('pocket')
+    expect(session.redo().puzzle).toBe('pocket')
+    // Undo of a Pocket Move is itself corner-only: the Phantoms stay solved.
+    expect(phantomsOf(session.cube.toString())).toBe(phantomsOf(Session.start().cube.toString()))
+  })
+})
+
 const SOLVED = 'WWWWWWWWW RRRRRRRRR GGGGGGGGG YYYYYYYYY OOOOOOOOO BBBBBBBBB'
 // y turns the whole Cube as U does: the front goes to the left, so the
 // right face's red comes to the front and the back's blue to the right.

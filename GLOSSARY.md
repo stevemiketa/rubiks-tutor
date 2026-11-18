@@ -32,6 +32,14 @@ _Avoid_: cubie, cubelet, block
 One colored square on the outside of a Piece.
 _Avoid_: facelet, tile, square
 
+**Live Sticker**:
+A Sticker a Puzzle actually uses and shows, so the only kind a user can select. The Cube's are all of them; the Pocket Cube's are only its corner Stickers.
+_Avoid_: real sticker, active sticker
+
+**Phantom Sticker**:
+A Sticker on a Phantom Piece: on the Pocket Cube, an edge or center Sticker that is frozen at solved and never shown. The complement of a Live Sticker.
+_Avoid_: dead sticker, hidden sticker
+
 **Layer**:
 A 3×3 slab of nine Pieces that can turn together, either horizontal or vertical, including the middle slabs.
 _Avoid_: row, column, slice, face (for the slab)

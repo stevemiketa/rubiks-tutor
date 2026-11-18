@@ -36,6 +36,7 @@ type sharedSnapshot struct {
 
 type loadedSnapshot struct {
 	ID        string    `json:"id"`
+	Type      string    `json:"type"`
 	Scramble  string    `json:"scramble"`
 	Moves     string    `json:"moves"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -64,7 +65,7 @@ func (api *snapshotAPI) create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, apiErr)
 		return
 	}
-	snap, err := snapshot.New(req.Scramble, req.Moves)
+	snap, err := snapshot.NewFor(req.Scramble, req.Moves, req.Puzzle)
 	if err != nil {
 		writeError(w, invalidSnapshot(err))
 		return
@@ -151,6 +152,7 @@ func (api *snapshotAPI) get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	writeJSON(w, http.StatusOK, loadedSnapshot{
 		ID:        saved.ID,
+		Type:      saved.Snapshot.Puzzle().String(),
 		Scramble:  cube.FormatMoves(saved.Snapshot.Scramble()),
 		Moves:     cube.FormatMoves(saved.Snapshot.Moves()),
 		CreatedAt: saved.CreatedAt,

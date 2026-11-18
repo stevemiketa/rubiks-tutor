@@ -1,13 +1,15 @@
 // Asking the server for a Solution: POST /api/solve.
-import { formatMoves, type Move } from '../cube/index.ts'
+import { DEFAULT_PUZZLE, formatMoves, puzzleWireType, type Move, type Puzzle } from '../cube/index.ts'
 import { parseSolveResponse, type SolveResult } from './solution.ts'
 
 /**
- * Finds the Solution for the Cube a Scramble and a Move history produce.
- * Rejects if it can't: with a SolveRefused when asking again with the same
- * Moves can't help, and with any other error when it might.
+ * Finds the Solution for the Cube a Scramble and a Move history produce on a
+ * Puzzle, defaulting to the 3x3. A Pocket Cube ('pocket') is sent as type
+ * '2x2', so the server solves its corners only. Rejects if it can't: with a
+ * SolveRefused when asking again with the same Moves can't help, and with any
+ * other error when it might.
  */
-export type Solver = (scramble: readonly Move[], moves: readonly Move[]) => Promise<SolveResult>
+export type Solver = (scramble: readonly Move[], moves: readonly Move[], puzzle?: Puzzle) => Promise<SolveResult>
 
 /**
  * The server refused a Solve, with an HTTP status that asking again with the
@@ -29,11 +31,15 @@ export class SolveRefused extends Error {
 const RETRYABLE = new Set([408, 429])
 
 /** The Solver the tutor uses: the Go solver, through POST /api/solve. */
-export const requestSolve: Solver = async (scramble, moves) => {
+export const requestSolve: Solver = async (scramble, moves, puzzle = DEFAULT_PUZZLE) => {
   const response = await fetch('/api/solve', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scramble: formatMoves(scramble), moves: formatMoves(moves) }),
+    body: JSON.stringify({
+      scramble: formatMoves(scramble),
+      moves: formatMoves(moves),
+      type: puzzleWireType(puzzle),
+    }),
   })
   if (response.status >= 400 && response.status < 500 && !RETRYABLE.has(response.status)) {
     throw new SolveRefused(response.status)

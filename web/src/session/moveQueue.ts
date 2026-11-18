@@ -2,7 +2,7 @@
 // Turns, a Scramble, Playback, the splash page's loop) enqueues them here,
 // and the 3D scene animates them one at a time, so input that arrives during
 // an animation waits its turn instead of being dropped or jumping ahead.
-import type { Cube, Move } from '../cube/index.ts'
+import { DEFAULT_PUZZLE, isRotation, type Cube, type Move, type Puzzle } from '../cube/index.ts'
 
 /** How long a quarter Turn or Cube rotation takes at normal speed, in ms. */
 export const QUARTER_TURN_MS = 250
@@ -30,9 +30,25 @@ export class MoveQueue {
   #shown: Cube
   #pending: QueuedMove[] = []
   readonly #listeners = new Set<() => void>()
+  // Which Puzzle's Moves these are: a Pocket Cube ('pocket') applies them
+  // corner-only, so the Cube it shows matches a Pocket Cube Session. A Snapshot
+  // opened in place of the Session can change it, so jump can switch it.
+  #puzzle: Puzzle
 
-  constructor(cube: Cube) {
+  constructor(cube: Cube, puzzle: Puzzle = DEFAULT_PUZZLE) {
     this.#shown = cube
+    this.#puzzle = puzzle
+  }
+
+  // Applies Moves the way this queue's Puzzle does. A Pocket Cube splits per
+  // Move: a whole-Cube rotation (x/y/z) is rigid, applied with full Cube.apply
+  // so a solved 2x2 stays solved in any orientation; a face Turn is corner-only
+  // (Cube.applyPocket), so its Phantom Stickers stay frozen (ADR 0005). This
+  // matches how a Pocket Cube Session evolves its Cube.
+  #apply(cube: Cube, moves: readonly Move[]): Cube {
+    if (this.#puzzle !== 'pocket') return cube.apply(moves)
+    for (const move of moves) cube = isRotation(move) ? cube.apply([move]) : cube.applyPocket([move])
+    return cube
   }
 
   /** The Cube with every finished Move applied: what the scene shows at rest. */
@@ -57,7 +73,7 @@ export class MoveQueue {
 
   /** The Cube the scene will show once every queued Move has finished. */
   get target(): Cube {
-    return this.#shown.apply(this.#pending.map((q) => q.move))
+    return this.#apply(this.#shown, this.#pending.map((q) => q.move))
   }
 
   /** Queues a Move to animate after everything already queued. */
@@ -74,17 +90,20 @@ export class MoveQueue {
   finish(item: QueuedMove): void {
     if (item !== this.#pending[0]) return
     this.#pending.shift()
-    this.#shown = this.#shown.apply([item.move])
+    this.#shown = this.#apply(this.#shown, [item.move])
     this.#notify()
   }
 
   /**
    * Shows a Cube at once, dropping every queued Move: for reduced motion, or
-   * for a Cube that didn't come from Moves, such as a restored Session.
+   * for a Cube that didn't come from Moves, such as a restored Session. Given
+   * a Puzzle, it also switches which one later Moves apply as, for a Snapshot
+   * opened in place of the Session (see Tutor.openSnapshot).
    */
-  jump(cube: Cube): void {
+  jump(cube: Cube, puzzle: Puzzle = this.#puzzle): void {
     this.#pending = []
     this.#shown = cube
+    this.#puzzle = puzzle
     this.#notify()
   }
 

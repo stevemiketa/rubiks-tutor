@@ -71,13 +71,13 @@ describe("a Session's Snapshot", () => {
   it('is the Scramble and the Move history, in standard notation', () => {
     const session = play(Session.start(parseMoves("R U' F2")), "M x2 E' z")
 
-    expect(session.toSnapshot()).toEqual({ scramble: "R U' F2", moves: "M x2 E' z" })
+    expect(session.toSnapshot()).toEqual({ scramble: "R U' F2", moves: "M x2 E' z", type: '3x3' })
   })
 
   it('leaves out undone Moves', () => {
     const session = play(Session.start(parseMoves('R U')), "M E S'").undo()
 
-    expect(session.toSnapshot()).toEqual({ scramble: 'R U', moves: 'M E' })
+    expect(session.toSnapshot()).toEqual({ scramble: 'R U', moves: 'M E', type: '3x3' })
   })
 
   it('opens as a new Session with that Scramble, Move history and Cube, and nothing to redo', () => {
@@ -160,7 +160,7 @@ describe('Tutor.share', () => {
     await server.settle()
     await sharing
 
-    expect(server.shared).toEqual([{ scramble: 'R U F', moves: "M' E" }])
+    expect(server.shared).toEqual([{ scramble: 'R U F', moves: "M' E", type: '3x3' }])
     expect(tutor.getState().sharing).toEqual({ status: 'shared', id: 'id1', url: 'https://cubular.example/s/id1' })
     expect(tutor.getState().snapshotId).toBe('id1')
   })
@@ -181,7 +181,7 @@ describe('Tutor.share', () => {
     void tutor.share()
     await server.settle()
 
-    expect(server.shared).toEqual([{ scramble: 'R U', moves: "U'" }])
+    expect(server.shared).toEqual([{ scramble: 'R U', moves: "U'", type: '3x3' }])
   })
 
   it('shares once at a time', async () => {
@@ -253,7 +253,7 @@ describe('Tutor.share', () => {
     await server.settle()
 
     // The link is to the Session as it was when Share was pressed.
-    expect(server.shared).toEqual([{ scramble: 'R U F', moves: "M' E" }])
+    expect(server.shared).toEqual([{ scramble: 'R U F', moves: "M' E", type: '3x3' }])
     expect(tutor.getState().sharing).toMatchObject({ status: 'shared', id: 'id1' })
     expect(tutor.getState().snapshotId).toBeUndefined()
   })
@@ -321,7 +321,7 @@ describe('Tutor.open with a share link', () => {
     expect(formatMoves(session.history)).toBe("M x2 E'")
     expect(tutor.queue.isIdle).toBe(true)
     expect(tutor.queue.shown.toString()).toBe(session.cube.toString())
-    expect(store.load()?.toSnapshot()).toEqual({ scramble: "R U' F2", moves: "M x2 E'" })
+    expect(store.load()?.toSnapshot()).toEqual({ scramble: "R U' F2", moves: "M x2 E'", type: '3x3' })
   })
 
   it('restores the saved Session on a reload of the link it was opened from: its Solution and Playback settings', async () => {
@@ -388,7 +388,7 @@ describe('Tutor.open with a share link', () => {
     await server.settle()
 
     expect(formatMoves(reloaded.getState().session.history)).toBe('U')
-    expect(store.load()?.toSnapshot()).toEqual({ scramble: 'R', moves: 'U' })
+    expect(store.load()?.toSnapshot()).toEqual({ scramble: 'R', moves: 'U', type: '3x3' })
   })
 
   it('opens any other link in place of the saved Session, even one that came from a Snapshot', async () => {
@@ -402,7 +402,7 @@ describe('Tutor.open with a share link', () => {
 
     const { session, snapshotId } = other.getState()
     expect(snapshotId).toBe('xyz')
-    expect(session.toSnapshot()).toEqual({ scramble: 'F', moves: 'B' })
+    expect(session.toSnapshot()).toEqual({ scramble: 'F', moves: 'B', type: '3x3' })
     expect(session.solution).toBeUndefined()
     expect(store.load()?.snapshotId).toBe('xyz')
   })
@@ -426,7 +426,7 @@ describe('Tutor.open with a share link', () => {
     tutor.turn('up')
 
     expect(tutor.getState().snapshotId).toBeUndefined()
-    expect(store.load()?.toSnapshot()).toEqual({ scramble: 'R', moves: "U M'" })
+    expect(store.load()?.toSnapshot()).toEqual({ scramble: 'R', moves: "U M'", type: '3x3' })
     expect(server.stored.get('abc')).toEqual({ scramble: 'R', moves: 'U' })
     expect(server.shared).toEqual([])
   })

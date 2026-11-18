@@ -68,6 +68,22 @@ describe('isSelectable', () => {
   })
 })
 
+// The Pocket Cube shows only its corner Stickers (positions 0, 2, 6, 8 on each
+// face); the edges and center are Phantom Stickers, frozen and never shown, so
+// they can't be selected.
+describe('isSelectable on the Pocket Cube', () => {
+  it('accepts only the four corner Stickers of the front, right and top faces', () => {
+    const corners = [0, 2, 6, 8]
+    for (const face of FACES) {
+      for (let position = 0; position < 9; position++) {
+        const sticker = stickerAt(face, Math.floor(position / 3), position % 3)
+        const live = (['U', 'R', 'F'] as Face[]).includes(face) && corners.includes(position)
+        expect(isSelectable(sticker, 'pocket')).toBe(live)
+      }
+    }
+  })
+})
+
 describe('rotationFor', () => {
   // Spec #3: Shift+← is y and Shift+→ y'; Shift+↑ is x and Shift+↓ x'; the
   // on-screen buttons add z and z', which roll the Cube around the axis
@@ -126,8 +142,44 @@ describe('stepSelection', () => {
   })
 
   it('never leaves the faces the camera sees', () => {
-    const visible = Array.from({ length: 54 }, (_, s) => s).filter(isSelectable)
+    const visible = Array.from({ length: 54 }, (_, s) => s).filter((s) => isSelectable(s))
     for (const s of visible) for (const d of DIRECTIONS) expect(isSelectable(stepSelection(s, d))).toBe(true)
+  })
+})
+
+// On the Pocket Cube the selection hops corner to corner, four per face,
+// skipping the frozen middle, and starts on a corner since there is no center.
+describe('stepSelection on the Pocket Cube', () => {
+  it.each(DIRECTIONS)('selects the front face’s top-left corner first (%s)', (direction) => {
+    expect(stickerName(stepSelection(undefined, direction, 'pocket'))).toBe('F0')
+  })
+
+  it.each([
+    // Within a face: corner to corner, skipping the Phantom Stickers between.
+    ['F0', 'right', 'F2'],
+    ['F2', 'left', 'F0'],
+    ['F0', 'down', 'F6'],
+    ['F6', 'up', 'F0'],
+    ['U0', 'right', 'U2'],
+    ['R0', 'down', 'R6'],
+    // Across the edges the faces share on screen.
+    ['F2', 'right', 'R0'],
+    ['F0', 'up', 'U6'],
+    ['U6', 'down', 'F0'],
+    ['R0', 'left', 'F2'],
+    // Stopping at the outside edges.
+    ['F0', 'left', 'F0'],
+    ['U0', 'up', 'U0'],
+    ['R2', 'right', 'R2'],
+  ] as const)('%s, %s: %s', (from, direction, to) => {
+    expect(stickerName(stepSelection(named(from), direction, 'pocket'))).toBe(to)
+  })
+
+  it('never leaves the live corner Stickers', () => {
+    const live = Array.from({ length: 54 }, (_, s) => s).filter((s) => isSelectable(s, 'pocket'))
+    for (const s of live) for (const d of DIRECTIONS) {
+      expect(isSelectable(stepSelection(s, d, 'pocket'), 'pocket')).toBe(true)
+    }
   })
 })
 

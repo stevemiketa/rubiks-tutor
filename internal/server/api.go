@@ -39,25 +39,49 @@ func writeError(w http.ResponseWriter, e *apiError) {
 }
 
 // movesRequest is a request body that carries a Session's Moves: a Scramble
-// and a Move history, each in space-separated notation.
+// and a Move history, each in space-separated notation, and the Puzzle the
+// Session is for.
 type movesRequest struct {
 	Scramble []cube.Move
 	Moves    []cube.Move
+	Puzzle   cube.Puzzle
 }
 
 // Cube returns the Cube the request describes: a solved Cube, then the
-// Scramble, then the Move history.
+// Scramble, then the Move history. A Pocket Cube splits per Move: a whole-Cube
+// rotation (x/y/z) is rigid, applied with full Apply so it moves the phantom
+// centers and edges together with the corners and a solved 2x2 stays solved in
+// any orientation; a face Turn is corner-only (ApplyPocket), so its phantom
+// edges and centers stay frozen (ADR 0005).
 func (r movesRequest) Cube() cube.Cube {
+	if r.Puzzle == cube.Pocket {
+		return applyPocketMoves(applyPocketMoves(cube.Solved(), r.Scramble), r.Moves)
+	}
 	return cube.Solved().Apply(r.Scramble...).Apply(r.Moves...)
 }
 
+// applyPocketMoves applies Moves to a Pocket Cube the rigid way: rotations
+// move the whole Cube (Apply), face Turns move only the corners (ApplyPocket).
+func applyPocketMoves(c cube.Cube, moves []cube.Move) cube.Cube {
+	for _, m := range moves {
+		if m.IsRotation() {
+			c = c.Apply(m)
+		} else {
+			c = c.ApplyPocket(m)
+		}
+	}
+	return c
+}
+
 // decodeMovesRequest reads and checks a movesRequest body: one JSON object
-// with both fields, valid notation, and no more than maxMoves Moves in a
-// body of at most maxBodyBytes.
+// with the scramble and moves fields, an optional "type" that names a Puzzle
+// (a missing type is the Cube), valid notation, and no more than maxMoves Moves
+// in a body of at most maxBodyBytes.
 func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *apiError) {
 	var body struct {
 		Scramble *string `json:"scramble"`
 		Moves    *string `json:"moves"`
+		Type     *string `json:"type"`
 	}
 	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	err := dec.Decode(&body)
@@ -83,6 +107,18 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 	}
 
 	var req movesRequest
+	if body.Type != nil {
+		puzzle, ok := cube.ParsePuzzle(*body.Type)
+		if !ok {
+			return movesRequest{}, &apiError{
+				status:  http.StatusBadRequest,
+				Code:    "invalid-type",
+				Message: fmt.Sprintf(`%q is not a Puzzle type; want "3x3" or "2x2"`, *body.Type),
+				Field:   "type",
+			}
+		}
+		req.Puzzle = puzzle
+	}
 	for _, f := range []struct {
 		name     string
 		notation string
@@ -99,6 +135,24 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 				Offset:  &perr.Offset,
 			}
 		}
+		// A 2x2 has no middle Layer: only outer-Layer face Turns and whole-Cube
+		// rotations make sense for it. A rotation is rigid (it turns the whole
+		// Cube); a face Turn is corner-only. Reject slice Moves (M E S) and any
+		// wide Turns here rather than let them reach the Pocket Move engine
+		// (ADR 0005). Wide Turns are already rejected at parse time.
+		if req.Puzzle == cube.Pocket {
+			for _, m := range moves {
+				if !isOuterTurn(m) && !m.IsRotation() {
+					return movesRequest{}, &apiError{
+						status:  http.StatusBadRequest,
+						Code:    "invalid-notation",
+						Message: fmt.Sprintf("%s: %v is not a face Turn or Cube rotation, which a 2x2 has no middle Layer for", f.name, m),
+						Field:   f.name,
+						Token:   m.String(),
+					}
+				}
+			}
+		}
 		*f.moves = moves
 	}
 	if n := len(req.Scramble) + len(req.Moves); n > maxMoves {
@@ -109,4 +163,14 @@ func decodeMovesRequest(w http.ResponseWriter, r *http.Request) (movesRequest, *
 		}
 	}
 	return req, nil
+}
+
+// isOuterTurn reports whether m is an outer-Layer face Turn (R L U D F B),
+// the only Moves that move a Pocket Cube's Pieces.
+func isOuterTurn(m cube.Move) bool {
+	switch m.Letter {
+	case 'R', 'L', 'U', 'D', 'F', 'B':
+		return true
+	}
+	return false
 }

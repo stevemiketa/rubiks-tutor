@@ -16,6 +16,6 @@ function page(route: Route) {
     case 'splash':
       return <SplashPage key="splash" />
     case 'tutor':
-      return <TutorPage key="tutor" snapshotId={route.snapshotId} />
+      return <TutorPage key="tutor" puzzle={route.puzzle} snapshotId={route.snapshotId} />
   }
 }

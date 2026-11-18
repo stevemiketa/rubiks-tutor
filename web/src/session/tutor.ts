@@ -4,7 +4,7 @@
 // animates. It starts new Sessions, asks the solver for Solutions, plays them
 // back, shares Sessions, opens share links, and saves the Session after every
 // change. React reads it through useSyncExternalStore; nothing here renders.
-import { Cube, formatMove, inverse, isRotation, type Move, type Sticker } from '../cube/index.ts'
+import { Cube, DEFAULT_PUZZLE, formatMove, inverse, isRotation, type Move, type Puzzle, type Sticker } from '../cube/index.ts'
 import {
   commandForKey,
   isSelectable,
@@ -17,7 +17,7 @@ import {
   type RotationDirection,
 } from './controls.ts'
 import { MoveQueue, moveDuration } from './moveQueue.ts'
-import { SCRAMBLE_TURN_MS, generateScramble } from './scramble.ts'
+import { SCRAMBLE_TURN_MS, generatePocketScramble, generateScramble } from './scramble.ts'
 import { Session, type PlaybackSpeed } from './session.ts'
 import type { SessionStore } from './sessionStore.ts'
 import type { Opening, Sharing, SnapshotClient } from './sharing.ts'
@@ -73,6 +73,12 @@ export interface TutorState {
 
 /** Where a Tutor saves its Session and how it starts new ones. Every option has a default. */
 export interface TutorOptions {
+  /**
+   * Which Puzzle a new Session solves: the 3x3 ('cube', the default) or the
+   * Pocket Cube ('pocket'). A Session opened from the store or a share link
+   * keeps its own puzzle; this only decides what newScramble starts.
+   */
+  readonly puzzle?: Puzzle
   /** Where the Session is saved after every change, and restored from by open. Omit to save nothing. */
   readonly store?: SessionStore
   /** Random numbers in [0, 1) for new Scrambles. Math.random by default. */
@@ -102,7 +108,7 @@ export class Tutor {
 
   /** A Tutor showing a Session as it is, with nothing to animate. */
   constructor(session: Session = Session.start(), options: TutorOptions = {}) {
-    this.queue = new MoveQueue(session.cube)
+    this.queue = new MoveQueue(session.cube, session.puzzle)
     this.#state = {
       session,
       selected: undefined,
@@ -139,8 +145,16 @@ export class Tutor {
       void tutor.openSnapshot(snapshotId)
       return tutor
     }
-    if (saved !== undefined) return new Tutor(saved, options)
-    const tutor = new Tutor(Session.start(), options)
+    // Restore the saved Session only when the route doesn't ask for a different
+    // Puzzle: a reload of /app or /app/2x2 keeps the work in progress, but
+    // explicitly picking the other Puzzle (such as "Solve the 2x2" over a saved
+    // 3x3) starts a fresh Session of it rather than restoring the old one.
+    if (saved !== undefined && (options.puzzle === undefined || saved.puzzle === options.puzzle)) {
+      return new Tutor(saved, options)
+    }
+    // Seed the Tutor with the puzzle it will scramble, so its MoveQueue applies
+    // the Scramble the same way the Session does (corner-only for a Pocket Cube).
+    const tutor = new Tutor(Session.start([], options.puzzle ?? DEFAULT_PUZZLE), options)
     tutor.#startNew()
     return tutor
   }
@@ -167,6 +181,17 @@ export class Tutor {
   }
 
   /**
+   * Switches to another Puzzle, starting a fresh Session of it with a new
+   * Scramble. Asking for the Puzzle already being solved is just newScramble,
+   * so it confirms before discarding Moves; a genuine switch is a deliberate
+   * reset and starts at once.
+   */
+  newPuzzle(puzzle: Puzzle): void {
+    if (puzzle === this.#state.session.puzzle) this.newScramble()
+    else this.#startNew(puzzle)
+  }
+
+  /**
    * Opens the Snapshot a share link names. Once it arrives it replaces the
    * Session, and the one saved in the store, and shows at once. Until then
    * Moves are ignored. Resolves when it has opened or failed: see
@@ -188,8 +213,11 @@ export class Tutor {
       if (stillOpening()) this.#update({ opening: 'failed' })
       return
     }
-    this.queue.jump(session.cube)
-    this.#update({ session, opening: undefined, scrambling: false, hint: undefined })
+    // The Snapshot carries its own puzzle, which may differ from the one the
+    // Tutor opened on: the queue now applies later Moves as that puzzle does,
+    // and a selection the new puzzle can't show is dropped.
+    this.queue.jump(session.cube, session.puzzle)
+    this.#update({ session, selected: this.#selectionFor(session.puzzle), opening: undefined, scrambling: false, hint: undefined })
   }
 
   /**
@@ -228,15 +256,21 @@ export class Tutor {
     if (this.#state.confirming === 'new-scramble') this.#update({ confirming: undefined })
   }
 
-  /** Selects a Sticker on the front, right or top face; ignores any other. */
+  /**
+   * Selects a Live Sticker on the front, right or top face; ignores any other,
+   * including a Pocket Cube's Phantom Stickers (its edges and center).
+   */
   select(sticker: Sticker): void {
-    if (!isSelectable(sticker)) return
+    if (!isSelectable(sticker, this.#state.session.puzzle)) return
     this.#update({ selected: sticker, hint: undefined })
   }
 
-  /** Moves the selection to the next Sticker one way, or selects the front face's center. */
+  /**
+   * Moves the selection to the next Sticker one way, or selects the front
+   * face's center — its top-left corner on a Pocket Cube, which has no center.
+   */
   stepSelection(direction: Direction): void {
-    this.select(stepSelection(this.#state.selected, direction))
+    this.select(stepSelection(this.#state.selected, direction, this.#state.session.puzzle))
   }
 
   clearSelection(): void {
@@ -321,7 +355,7 @@ export class Tutor {
 
     let result
     try {
-      result = await (this.#options.solve ?? requestSolve)(scramble, history)
+      result = await (this.#options.solve ?? requestSolve)(scramble, history, session.puzzle)
     } catch (error) {
       this.#update({ solveStatus: failedSolveStatus(error) })
       return
@@ -521,30 +555,45 @@ export class Tutor {
   }
 
   // Queues a Move for the scene to animate, or shows it at once when there is
-  // no scene to play the queue.
+  // no scene to play the queue. Without a scene it jumps to the Session's own
+  // Cube, so a Pocket Cube's corner-only Move is shown as the Session made it.
   #show(move: Move, durationMs?: number): void {
-    if (this.#options.animates?.() === false) this.queue.jump(this.queue.target.apply([move]))
+    if (this.#options.animates?.() === false) this.queue.jump(this.#state.session.cube)
     else this.queue.enqueue(move, durationMs)
   }
 
-  // Starts a new Session with a fresh Scramble, played from a solved Cube.
-  #startNew(): void {
-    const session = Session.start(generateScramble(this.#options.random))
+  // Starts a new Session with a fresh Scramble, played from a solved Cube, for
+  // a Puzzle: the one asked for, or else the one being solved now. A Pocket
+  // Cube ('pocket') gets a corner-only Scramble and evolves corner-only, and
+  // the queue switches to apply its Moves the same way.
+  #startNew(puzzle: Puzzle = this.#state.session.puzzle): void {
+    const scramble = puzzle === 'pocket' ? generatePocketScramble(this.#options.random) : generateScramble(this.#options.random)
+    const session = Session.start(scramble, puzzle)
     const changes = {
       session,
+      // Switching Puzzle can leave a selection the new one doesn't show (a 3x3
+      // center is a Pocket Cube Phantom Sticker), so drop one it can't select.
+      selected: this.#selectionFor(puzzle),
       hint: undefined,
       confirming: undefined,
       solveStatus: this.#settledSolveStatus(),
       opening: undefined,
     }
     if (this.#options.reducedMotion?.()) {
-      this.queue.jump(session.cube)
+      this.queue.jump(session.cube, puzzle)
       this.#update({ ...changes, scrambling: false })
       return
     }
-    this.queue.jump(Cube.solved())
+    this.queue.jump(Cube.solved(), puzzle)
     for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_TURN_MS)
     this.#update({ ...changes, scrambling: true })
+  }
+
+  // The current selection kept only if the Puzzle can still show it, so a
+  // Puzzle switch never leaves a Phantom Sticker selected.
+  #selectionFor(puzzle: Puzzle): Sticker | undefined {
+    const { selected } = this.#state
+    return selected !== undefined && isSelectable(selected, puzzle) ? selected : undefined
   }
 
   #client(): SnapshotClient {

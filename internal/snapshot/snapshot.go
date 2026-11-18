@@ -41,17 +41,36 @@ var (
 // Snapshot.
 var ErrNotFound = errors.New("snapshot not found")
 
-// Snapshot is a Scramble and the Move history made after it. Use [New] or
-// [Parse] to make one; the zero Snapshot is valid and empty.
+// Puzzle is which twisty Puzzle a Snapshot is for, re-exported from the cube
+// model (ADR 0005). The zero value is the Cube.
+type Puzzle = cube.Puzzle
+
+// The Puzzles, re-exported so callers of this package need not import cube
+// only to name one.
+const (
+	Cube3x3 = cube.Cube3x3
+	Pocket  = cube.Pocket
+)
+
+// Snapshot is a Scramble, the Move history made after it, and the Puzzle it is
+// for. Use [New], [NewFor], [Parse] or [ParseFor] to make one; the zero
+// Snapshot is valid and empty, and for the Cube.
 type Snapshot struct {
 	scramble []cube.Move
 	moves    []cube.Move
+	puzzle   cube.Puzzle
 }
 
-// New returns the Snapshot of a Scramble and a Move history. The Scramble
+// New returns the Cube Snapshot of a Scramble and a Move history. The Scramble
 // may contain only outer-Layer Turns, and the two together at most
 // [MaxMoves] Moves.
 func New(scramble, moves []cube.Move) (Snapshot, error) {
+	return NewFor(scramble, moves, Cube3x3)
+}
+
+// NewFor returns the Snapshot of a Scramble and a Move history for a Puzzle,
+// validated as [New] does.
+func NewFor(scramble, moves []cube.Move, puzzle Puzzle) (Snapshot, error) {
 	for i, m := range scramble {
 		if !isOuterTurn(m) {
 			return Snapshot{}, fmt.Errorf("%w: Move %d of the Scramble is %v", ErrInvalidScramble, i+1, m)
@@ -60,13 +79,19 @@ func New(scramble, moves []cube.Move) (Snapshot, error) {
 	if n := len(scramble) + len(moves); n > MaxMoves {
 		return Snapshot{}, fmt.Errorf("%w: %d Moves, more than the %d a Snapshot can hold", ErrTooManyMoves, n, MaxMoves)
 	}
-	return Snapshot{scramble: scramble, moves: moves}, nil
+	return Snapshot{scramble: scramble, moves: moves, puzzle: puzzle}, nil
 }
 
-// Parse returns the Snapshot of a Scramble and a Move history written in
+// Parse returns the Cube Snapshot of a Scramble and a Move history written in
 // standard notation, validated as [New] does. Invalid notation gives an
 // error wrapping both [ErrInvalidNotation] and the [*cube.ParseError].
 func Parse(scramble, moves string) (Snapshot, error) {
+	return ParseFor(scramble, moves, Cube3x3)
+}
+
+// ParseFor returns the Snapshot of a Scramble and a Move history in standard
+// notation, for a Puzzle, validated as [NewFor] does.
+func ParseFor(scramble, moves string, puzzle Puzzle) (Snapshot, error) {
 	s, err := cube.ParseMoves(scramble)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("%w: scramble: %w", ErrInvalidNotation, err)
@@ -75,7 +100,7 @@ func Parse(scramble, moves string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("%w: moves: %w", ErrInvalidNotation, err)
 	}
-	return New(s, m)
+	return NewFor(s, m, puzzle)
 }
 
 func isOuterTurn(m cube.Move) bool {
@@ -92,16 +117,30 @@ func (s Snapshot) Scramble() []cube.Move { return s.scramble }
 // Moves returns the Move history: every Move made after the Scramble.
 func (s Snapshot) Moves() []cube.Move { return s.moves }
 
+// Puzzle returns the Puzzle the Snapshot is for.
+func (s Snapshot) Puzzle() cube.Puzzle { return s.puzzle }
+
 // bodyVersion is the version of the body format. A body never changes once
 // stored, so a new format gets a new version and old bodies stay readable.
-const bodyVersion = 1
+// Version 2 added the "type" field (ADR 0005); a version-1 body has no type
+// and reads as the Cube, so every share link stored before 2x2 support keeps
+// its content-addressed ID.
+const bodyVersion = 2
 
-// body is the stored format: JSON with the fields in this order, and Moves in
-// notation separated by single spaces.
+// body is the stored format: JSON with the fields in this order, Moves in
+// notation separated by single spaces, and the Puzzle as its wire tag.
 type body struct {
 	Version  int    `json:"version"`
+	Type     string `json:"type"`
 	Scramble string `json:"scramble"`
 	Moves    string `json:"moves"`
+}
+
+// Puzzle returns the Puzzle a stored body is for: its "type" tag, or the Cube
+// when the tag is absent, as a version-1 body is.
+func (b body) Puzzle() cube.Puzzle {
+	p, _ := cube.ParsePuzzle(b.Type)
+	return p
 }
 
 // Body returns the Snapshot's canonical serialization: the same Snapshot
@@ -109,6 +148,7 @@ type body struct {
 func (s Snapshot) Body() []byte {
 	b, err := json.Marshal(body{
 		Version:  bodyVersion,
+		Type:     s.puzzle.String(),
 		Scramble: cube.FormatMoves(s.scramble),
 		Moves:    cube.FormatMoves(s.moves),
 	})
@@ -118,16 +158,17 @@ func (s Snapshot) Body() []byte {
 	return b
 }
 
-// FromBody reads a Snapshot back from its [Snapshot.Body].
+// FromBody reads a Snapshot back from its [Snapshot.Body], including the bodies
+// of earlier versions: a version-1 body has no "type" and reads as the Cube.
 func FromBody(b []byte) (Snapshot, error) {
 	var stored body
 	if err := json.Unmarshal(b, &stored); err != nil {
 		return Snapshot{}, fmt.Errorf("reading a Snapshot body: %w", err)
 	}
-	if stored.Version != bodyVersion {
+	if stored.Version < 1 || stored.Version > bodyVersion {
 		return Snapshot{}, fmt.Errorf("reading a Snapshot body: unknown version %d", stored.Version)
 	}
-	return Parse(stored.Scramble, stored.Moves)
+	return ParseFor(stored.Scramble, stored.Moves, stored.Puzzle())
 }
 
 // IDs returns the IDs a body may be stored under, shortest first: every

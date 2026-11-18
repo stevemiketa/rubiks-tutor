@@ -24,12 +24,13 @@ describe('SessionStore', () => {
     expect(formatMoves(restored?.redo().redo().history ?? [])).toBe("M' x U2 E y' S")
   })
 
-  it('saves in a versioned format: Moves in notation, under a version number', () => {
+  it('saves in a versioned format: Moves in notation, under a version number, with the puzzle', () => {
     const storage = new MemoryStorage()
     new SessionStore(storage).save(play(Session.start(parseMoves("R U2 F'")), "M' x y2").undo())
     expect(storage.items.size).toBe(1)
     expect(JSON.parse(storage.saved ?? '')).toEqual({
-      version: 4,
+      version: 5,
+      puzzle: 'cube',
       scramble: "R U2 F'",
       history: "M' x",
       undone: 'y2',
@@ -38,17 +39,28 @@ describe('SessionStore', () => {
     })
   })
 
+  it('saves the puzzle a Pocket Cube Session solves', () => {
+    const storage = new MemoryStorage()
+    new SessionStore(storage).save(play(Session.start(parseMoves("R U F'"), 'pocket'), 'U').undo())
+    const saved = JSON.parse(storage.saved ?? '')
+    expect(saved).toMatchObject({ version: 5, puzzle: 'pocket' })
+    const restored = new SessionStore(storage).load()
+    expect(restored?.puzzle).toBe('pocket')
+    // Its Cube evolved corner-only, so a 3x3 reading of the same Moves differs.
+    expect(restored?.cube.toString()).toBe(play(Session.start(parseMoves("R U F'"), 'pocket'), 'U').undo().cube.toString())
+  })
+
   it('saves the ID of the Snapshot the Session is a copy of', () => {
     const storage = new MemoryStorage()
     new SessionStore(storage).save(Session.fromSnapshot({ scramble: "R U2 F'", moves: "M' x" }, 'Ab3_x-9QzK'))
-    expect(JSON.parse(storage.saved ?? '')).toMatchObject({ version: 4, snapshotId: 'Ab3_x-9QzK' })
+    expect(JSON.parse(storage.saved ?? '')).toMatchObject({ version: 5, snapshotId: 'Ab3_x-9QzK' })
   })
 
-  it('restores a Session saved in version 4 of the format', () => {
+  it('restores a Session saved in version 5 of the format', () => {
     const storage = new MemoryStorage()
     storage.setItem(
       'cubular.session',
-      '{"version":4,"scramble":"R U2 F\'","history":"M\' x","undone":"y2 E","solution":null,"snapshotId":"Ab3_x-9QzK"}',
+      '{"version":5,"puzzle":"cube","scramble":"R U2 F\'","history":"M\' x","undone":"y2 E","solution":null,"snapshotId":"Ab3_x-9QzK"}',
     )
 
     const restored = new SessionStore(storage).load()
@@ -76,19 +88,21 @@ describe('SessionStore', () => {
   })
 
   it.each([
-    ['not JSON', '{"version":4,'],
+    ['not JSON', '{"version":5,'],
     ['JSON null', 'null'],
     ['a number', '42'],
     ['a list', '[1, "R U"]'],
-    ['no Scramble', '{"version":4,"history":"R","undone":"","solution":null,"snapshotId":null}'],
-    ['no Move history', '{"version":4,"scramble":"R","undone":"","solution":null,"snapshotId":null}'],
-    ['no redo stack', '{"version":4,"scramble":"R","history":"","solution":null,"snapshotId":null}'],
-    ['Moves that aren’t notation', '{"version":4,"scramble":["R"],"history":"","undone":"","solution":null,"snapshotId":null}'],
-    ['notation with a bad Move', '{"version":4,"scramble":"R","history":"U X","undone":"","solution":null,"snapshotId":null}'],
-    ['a redo stack with a bad Move', '{"version":4,"scramble":"R","history":"","undone":"Rw","solution":null,"snapshotId":null}'],
-    ['no Snapshot ID field', '{"version":4,"scramble":"R","history":"","undone":"","solution":null}'],
-    ['a Snapshot ID that isn’t text', '{"version":4,"scramble":"R","history":"","undone":"","solution":null,"snapshotId":7}'],
-    ['an empty Snapshot ID', '{"version":4,"scramble":"R","history":"","undone":"","solution":null,"snapshotId":""}'],
+    ['no puzzle', '{"version":5,"scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
+    ['a puzzle that isn’t a Puzzle', '{"version":5,"puzzle":"4x4","scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
+    ['no Scramble', '{"version":5,"puzzle":"cube","history":"R","undone":"","solution":null,"snapshotId":null}'],
+    ['no Move history', '{"version":5,"puzzle":"cube","scramble":"R","undone":"","solution":null,"snapshotId":null}'],
+    ['no redo stack', '{"version":5,"puzzle":"cube","scramble":"R","history":"","solution":null,"snapshotId":null}'],
+    ['Moves that aren’t notation', '{"version":5,"puzzle":"cube","scramble":["R"],"history":"","undone":"","solution":null,"snapshotId":null}'],
+    ['notation with a bad Move', '{"version":5,"puzzle":"cube","scramble":"R","history":"U X","undone":"","solution":null,"snapshotId":null}'],
+    ['a redo stack with a bad Move', '{"version":5,"puzzle":"cube","scramble":"R","history":"","undone":"Rw","solution":null,"snapshotId":null}'],
+    ['no Snapshot ID field', '{"version":5,"puzzle":"cube","scramble":"R","history":"","undone":"","solution":null}'],
+    ['a Snapshot ID that isn’t text', '{"version":5,"puzzle":"cube","scramble":"R","history":"","undone":"","solution":null,"snapshotId":7}'],
+    ['an empty Snapshot ID', '{"version":5,"puzzle":"cube","scramble":"R","history":"","undone":"","solution":null,"snapshotId":""}'],
   ])('restores nothing from unreadable data: %s', (_, saved) => {
     const storage = new MemoryStorage()
     storage.setItem('cubular.session', saved)
@@ -103,8 +117,12 @@ describe('SessionStore', () => {
       'version 3, from before a Session remembered its Snapshot',
       '{"version":3,"scramble":"R","history":"","undone":"","solution":null}',
     ],
-    ['a newer version', '{"version":5,"scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
-    ['a version as text', '{"version":"4","scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
+    [
+      'version 4, from before a Session knew its puzzle',
+      '{"version":4,"scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}',
+    ],
+    ['a newer version', '{"version":6,"puzzle":"cube","scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
+    ['a version as text', '{"version":"5","puzzle":"cube","scramble":"R","history":"","undone":"","solution":null,"snapshotId":null}'],
   ])('restores nothing from data in another format: %s', (_, saved) => {
     const storage = new MemoryStorage()
     storage.setItem('cubular.session', saved)

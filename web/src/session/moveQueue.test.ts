@@ -101,6 +101,27 @@ describe('MoveQueue', () => {
     queue.enqueue(parseMove('R'), 80)
     expect(queue.current?.durationMs).toBe(80)
   })
+
+  it('applies a Pocket Cube rotation with full semantics, leaving a solved 2x2 solved', () => {
+    // A whole-Cube rotation on a Pocket Cube is rigid: it moves the Phantom
+    // centers with the corners, so the shown Cube matches a full-Cube rotation
+    // and a solved 2x2 stays solved.
+    const queue = new MoveQueue(solved, 'pocket')
+    queue.enqueue(parseMove('x'))
+    queue.finish(queue.current as QueuedMove)
+    expect(queue.shown.toString()).toBe(solved.apply(parseMoves('x')).toString())
+    expect(queue.shown.isSolved()).toBe(true)
+  })
+
+  it('still freezes the Phantom Stickers for a Pocket Cube face Turn', () => {
+    // A face Turn stays corner-only: it leaves the Phantom Stickers solved,
+    // so the shown Cube differs from a full-Cube Turn.
+    const queue = new MoveQueue(solved, 'pocket')
+    queue.enqueue(parseMove('R'))
+    queue.finish(queue.current as QueuedMove)
+    expect(queue.shown.toString()).toBe(solved.applyPocket(parseMoves('R')).toString())
+    expect(queue.shown.toString()).not.toBe(solved.apply(parseMoves('R')).toString())
+  })
 })
 
 describe('moveDuration', () => {

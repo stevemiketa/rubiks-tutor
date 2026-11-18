@@ -29,6 +29,9 @@ const EVERY_MOVE =
   "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2 " +
   "M M' M2 E E' E2 S S' S2 x x' x2 y y' y2 z z' z2"
 const EVERY_ROTATION = "x x' x2 y y' y2 z z' z2"
+// Every Move a 2x2 Pocket Cube has: the six face Turns, each with its prime and
+// double. No middle Layers or Cube rotations.
+const EVERY_FACE_TURN = "R R' R2 L L' L2 U U' U2 D D' D2 F F' F2 B B' B2"
 
 type Json = Record<string, unknown>
 
@@ -118,6 +121,34 @@ function moveCases(file: Json): void {
   })
 }
 
+// A Sticker is a corner Sticker at positions 0, 2, 6 and 8 on each face; the
+// other 30 (edges at 1, 3, 5, 7 and the center at 4) are Phantom Stickers.
+const isCornerSticker = (s: Sticker): boolean => [0, 2, 6, 8].includes(s % 9)
+
+// phantomsSolved reports whether every Phantom Sticker still holds its solved
+// color: the 2x2 must never disturb the edges and centers.
+function phantomsSolved(cube: Cube): boolean {
+  const solved = Cube.solved()
+  for (let s = 0; s < 54; s++) {
+    if (!isCornerSticker(s) && cube.at(s) !== solved.at(s)) return false
+  }
+  return true
+}
+
+function moves2x2Cases(file: Json): void {
+  it('applies every face Turn alone to a solved 2x2', () => {
+    const fromSolved = (file.cases as Json[]).filter((c) => c.start === undefined).map((c) => c.moves)
+    for (const move of EVERY_FACE_TURN.split(' ')) expect(fromSolved).toContain(move)
+  })
+  eachCase(file, ['moves', 'expect', 'solved', 'phantomsSolved'], ['start'], (c) => {
+    const got = state(str(c, 'start')).applyPocket(parseMoves(str(c, 'moves')))
+    expect(got.toString()).toBe(state(str(c, 'expect')).toString())
+    expect(got.isSolved()).toBe(c.solved)
+    expect(phantomsSolved(got)).toBe(c.phantomsSolved)
+    expect(phantomsSolved(got), `Phantom Stickers after ${String(c.moves)}`).toBe(true)
+  })
+}
+
 function inverseCases(file: Json): void {
   eachCase(file, ['moves', 'inverse'], ['start'], (c) => {
     const moves = parseMoves(str(c, 'moves'))
@@ -204,6 +235,7 @@ function pieceCases(file: Json): void {
 const runners: Record<string, { fields: string[]; run: (file: Json) => void }> = {
   notation: { fields: ['cases'], run: notationCases },
   moves: { fields: ['cases'], run: moveCases },
+  'moves-2x2': { fields: ['cases'], run: moves2x2Cases },
   inverse: { fields: ['cases'], run: inverseCases },
   equivalences: { fields: ['cases'], run: equivalenceCases },
   relabel: { fields: ['cases'], run: relabelCases },

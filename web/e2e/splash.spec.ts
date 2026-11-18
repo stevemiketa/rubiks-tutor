@@ -31,7 +31,7 @@ test('the splash page shows the Cube solving itself, without calling the server'
 
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Cubular' })).toBeVisible()
-  await expect(page.getByRole('link', { name: 'Start solving' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Solve the 3×3' })).toBeVisible()
   await expect(page.getByRole('img', { name: 'The Cube solving itself' })).toBeVisible()
 
   // The page fades in, which changes the picture too, so wait for it to
@@ -69,7 +69,7 @@ test.describe('under reduced motion', () => {
     await page.waitForTimeout(2500)
     expect(await cubePicture(page)).toBe(previous)
 
-    await page.getByRole('link', { name: 'Start solving' }).click()
+    await page.getByRole('link', { name: 'Solve the 3×3' }).click()
     await expect(page.getByRole('heading', { name: 'Tutor' })).toBeVisible()
   })
 
@@ -100,7 +100,7 @@ test.describe('without WebGL', () => {
     await expect(page.getByRole('heading', { name: 'Cubular' })).toBeVisible()
     await expect(page.getByText(NO_WEBGL_EXPLANATION)).toBeVisible()
 
-    await page.getByRole('link', { name: 'Start solving' }).click()
+    await page.getByRole('link', { name: 'Solve the 3×3' }).click()
     await expect(page.getByRole('heading', { name: 'Tutor' })).toBeVisible()
     await expect(page.getByText(NO_WEBGL_EXPLANATION)).toBeVisible()
     // With nothing to animate it, the Scramble is applied at once rather

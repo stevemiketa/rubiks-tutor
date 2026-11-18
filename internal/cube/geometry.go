@@ -118,3 +118,36 @@ var movePerms = func() []perm {
 }()
 
 func movePerm(m Move) perm { return movePerms[moveIndex(m)] }
+
+// isCornerSticker reports whether Sticker s is one of the 24 corner Stickers:
+// the four positions 0, 2, 6 and 8 on each face. The other 30 Stickers are
+// Phantom Stickers (edges and centers), which a 2x2 Pocket Cube leaves frozen.
+func isCornerSticker(s Sticker) bool {
+	switch int(s) % 9 {
+	case 0, 2, 6, 8:
+		return true
+	default:
+		return false
+	}
+}
+
+// cornerMovePerms is movePerms restricted to the corner Stickers: for each
+// Move, it permutes the 24 corner Stickers exactly as the full 3x3 does and is
+// the identity on every Phantom Sticker. Applying any sequence of these leaves
+// all 30 Phantom Stickers where they started, so a solved 2x2 keeps its edges
+// and centers solved (ADR 0005).
+var cornerMovePerms = func() []perm {
+	perms := make([]perm, len(allMoves))
+	for i, full := range movePerms {
+		for s := range Sticker(54) {
+			if isCornerSticker(s) {
+				perms[i][s] = full[s]
+			} else {
+				perms[i][s] = s
+			}
+		}
+	}
+	return perms
+}()
+
+func cornerMovePerm(m Move) perm { return cornerMovePerms[moveIndex(m)] }

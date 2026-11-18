@@ -139,6 +139,13 @@ a {
   text-shadow: 0 1px 12px var(--color-splash-subtitle-shadow);
 }
 
+.splash-start {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+
 .splash-start .button {
   padding: 0.9rem 2.25rem;
   font-size: 1.125rem;
@@ -416,15 +423,17 @@ a {
   margin-left: auto;
 }
 
-/* The Theme control: a label and a native select, styled as the buttons
-   beside it are. */
-.theme-control {
+/* The Theme control and the Puzzle switch: a label and a native select,
+   styled as the buttons beside them are. */
+.theme-control,
+.puzzle-switch {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
 }
 
-.theme-control select {
+.theme-control select,
+.puzzle-switch select {
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--color-border-control);
   border-radius: 0.5rem;
@@ -434,8 +443,14 @@ a {
   cursor: pointer;
 }
 
-.theme-control select:hover {
+.theme-control select:hover,
+.puzzle-switch select:hover {
   background: var(--color-control-hover);
+}
+
+.puzzle-switch select:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .cube-view.draggable canvas {

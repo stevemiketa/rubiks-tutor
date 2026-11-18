@@ -125,6 +125,21 @@ func (c Cube) Apply(moves ...Move) Cube {
 	return c
 }
 
+// ApplyPocket returns the Cube after the Moves, in order, applied with
+// corner-only (2x2 Pocket Cube) semantics: each Move permutes only the 24
+// corner Stickers and leaves the 30 Phantom Stickers (edges and centers)
+// frozen. A Move's corner permutation is exactly its 3x3 permutation, so the
+// 2x2 solves with the 3x3 engine (ADR 0005). Only the face Turns R L U D F B
+// and their primes and doubles make sense for a 2x2; middle-Layer Moves (M E S)
+// move no corners and Cube rotations are not corner-only, so passing them is a
+// programming error rather than a Pocket Cube Move.
+func (c Cube) ApplyPocket(moves ...Move) Cube {
+	for _, m := range moves {
+		c = permute(c, cornerMovePerm(m))
+	}
+	return c
+}
+
 // IsSolved reports whether every face is a single color, in any orientation.
 func (c Cube) IsSolved() bool {
 	for s := range c {

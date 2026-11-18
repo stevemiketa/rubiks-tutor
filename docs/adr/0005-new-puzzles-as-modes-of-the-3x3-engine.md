@@ -8,6 +8,7 @@ We do generalize the one thing that is shared across every Puzzle: the output co
 
 - The 2×2 and the Mirror Cube ship without a Puzzle interface; both reuse the `[54]Color` model, the Go Solver, and the shared Go↔TS test cases (ADR 0002).
 - Every Snapshot and solve request carries a puzzle type from now on; adding a Puzzle later needs no Snapshot migration.
+- Because the model keeps all 54 Stickers, each Puzzle's *presentation* decides which of them are live: a Puzzle exposes only its Live Stickers to selection and keyboard navigation — all nine per face on the 3×3, but only the four corner Stickers per face on the Pocket Cube, never a Phantom Sticker. The selection layer takes the puzzle type; the Sticker arithmetic is untouched.
 - #41 owns promoting `Cube` and `Solver` to interfaces, informed by what building the 2×2 and the Mirror Cube teaches about where the 3×3 assumptions bite.
 
 ## Considered Options

@@ -20,6 +20,7 @@ export {
   FACES,
   SOLVED_COLORS,
   faceNormal,
+  isCornerSticker,
   moveAxis,
   relabel,
   stickerAt,
@@ -33,4 +34,13 @@ export {
   type Vec,
 } from './geometry.ts'
 export { PIECE_NAMES, SLOTS, type Location, type Slot } from './pieces.ts'
+export {
+  DEFAULT_PUZZLE,
+  isLiveSticker,
+  isPuzzle,
+  puzzleFromWireType,
+  puzzleWireType,
+  type Puzzle,
+  type PuzzleWireType,
+} from './puzzle.ts'
 export { Cube } from './cube.ts'
