@@ -191,10 +191,12 @@ export function movePerm(move: Move): Perm {
   return PERMS[moveIndex(move)] as Perm
 }
 
-// Whether a Sticker is one of the 24 corner Stickers: positions 0, 2, 6 and 8
-// on each face. The other 30 are Phantom Stickers (edges and centers), which a
-// 2x2 Pocket Cube leaves frozen.
-const isCornerSticker = (s: Sticker): boolean => [0, 2, 6, 8].includes(s % 9)
+/**
+ * Whether a Sticker is one of the 24 corner Stickers: positions 0, 2, 6 and 8
+ * on each face. The other 30 are Phantom Stickers (edges and centers), which a
+ * 2x2 Pocket Cube leaves frozen.
+ */
+export const isCornerSticker = (s: Sticker): boolean => [0, 2, 6, 8].includes(s % 9)
 
 // Each Move's permutation restricted to the corner Stickers: it permutes the 24
 // corner Stickers exactly as the full 3x3 does and is the identity on every

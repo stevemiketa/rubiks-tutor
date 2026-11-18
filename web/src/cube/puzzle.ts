@@ -1,3 +1,5 @@
+import { isCornerSticker, type Sticker } from './geometry.ts'
+
 // The Puzzle a Session solves. Both are modes of the one 3x3 engine (ADR
 // 0005): 'cube' is the ordinary 3x3, 'pocket' is the 2x2 Pocket Cube, a
 // corners-only 3x3 whose Moves permute only the 24 corner Stickers
@@ -7,6 +9,16 @@ export type Puzzle = 'cube' | 'pocket'
 
 /** The default Puzzle: the ordinary 3x3, which a missing type always means. */
 export const DEFAULT_PUZZLE: Puzzle = 'cube'
+
+/**
+ * Whether a Sticker is live on a Puzzle: one it uses and shows, so the only
+ * kind the learner can select. The Cube's Stickers are all live; the Pocket
+ * Cube's are only its 24 corner Stickers, the other 30 being Phantom Stickers
+ * it freezes and never shows (ADR 0005).
+ */
+export function isLiveSticker(puzzle: Puzzle, sticker: Sticker): boolean {
+  return puzzle === 'pocket' ? isCornerSticker(sticker) : true
+}
 
 /** Whether a value is a Puzzle, for reading it back from saved or shared data. */
 export function isPuzzle(value: unknown): value is Puzzle {

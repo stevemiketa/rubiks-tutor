@@ -77,7 +77,7 @@ export function TutorPage({ snapshotId, puzzle }: { snapshotId?: string; puzzle?
               queue={tutor.queue}
               selected={state.selected}
               onSelect={(sticker) => tutor.select(sticker)}
-              selectable={isSelectable}
+              selectable={(sticker) => isSelectable(sticker, session.puzzle)}
               onRotate={(rotations) => tutor.recordDrag(rotations)}
               // The Pieces of the Stage Playback is in, until the Cube is solved.
               highlighted={solved ? undefined : session.teaching?.stage.pieces}

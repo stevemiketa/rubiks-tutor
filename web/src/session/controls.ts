@@ -4,7 +4,9 @@
 // mapping depends only on where the Sticker is and never on the Cube's
 // colors, and it still holds after a Cube rotation.
 import {
+  DEFAULT_PUZZLE,
   inverse,
+  isLiveSticker,
   parseMove,
   stickerAt,
   stickerCol,
@@ -12,6 +14,7 @@ import {
   stickerRow,
   type Face,
   type Move,
+  type Puzzle,
   type Sticker,
 } from '../cube/index.ts'
 
@@ -129,9 +132,13 @@ export function commandForKey(press: KeyPress): Command | undefined {
   return undefined
 }
 
-/** Whether a Sticker can be selected: it is on the front, right or top face. */
-export function isSelectable(sticker: Sticker): boolean {
-  return CONTROLS[stickerFace(sticker)] !== undefined
+/**
+ * Whether a Sticker can be selected on a Puzzle: it is on the front, right or
+ * top face, and it is a Live Sticker — every Sticker on the 3x3, but only the
+ * corner Stickers on the Pocket Cube, never a Phantom Sticker.
+ */
+export function isSelectable(sticker: Sticker, puzzle: Puzzle = DEFAULT_PUZZLE): boolean {
+  return CONTROLS[stickerFace(sticker)] !== undefined && isLiveSticker(puzzle, sticker)
 }
 
 /**
@@ -165,24 +172,45 @@ const STEPS: Readonly<Record<Direction, readonly [col: number, row: number]>> = 
   right: [1, 0],
 }
 
-/**
- * The Sticker next to the selected one in a direction, for choosing a
- * Sticker from the keyboard. The selection crosses between faces where they
- * meet (top and front, front and right) and stays put at the outside edges.
- * With nothing selected it starts at the front face's center. Throws a
- * RangeError for a Sticker that isn't selectable.
- */
-export function stepSelection(selected: Sticker | undefined, direction: Direction): Sticker {
-  if (selected === undefined) return stickerAt('F', 1, 1)
-  const from = LAYOUT[stickerFace(selected)]
-  if (from === undefined) throw new RangeError(`Stickers on face ${stickerFace(selected)} can't be selected`)
-  const [dc, dr] = STEPS[direction]
-  const col = from.col + stickerCol(selected) + dc
-  const row = from.row + stickerRow(selected) + dr
+// The selectable Sticker at a position in the flattened layout, or undefined
+// when the position falls off the three faces the camera sees.
+function stickerAtGrid(col: number, row: number): Sticker | undefined {
   for (const [face, corner] of Object.entries(LAYOUT)) {
     const c = col - corner.col
     const r = row - corner.row
     if (c >= 0 && c < 3 && r >= 0 && r < 3) return stickerAt(face as Face, r, c)
   }
-  return selected
+  return undefined
+}
+
+/**
+ * The Sticker next to the selected one in a direction, for choosing a
+ * Sticker from the keyboard. The selection crosses between faces where they
+ * meet (top and front, front and right) and stays put at the outside edges,
+ * skipping any Phantom Sticker so the Pocket Cube steps corner to corner.
+ * With nothing selected it starts at the front face's center, or its top-left
+ * corner on the Pocket Cube, which has no center. Throws a RangeError for a
+ * selected Sticker that isn't on a visible face.
+ */
+export function stepSelection(
+  selected: Sticker | undefined,
+  direction: Direction,
+  puzzle: Puzzle = DEFAULT_PUZZLE,
+): Sticker {
+  if (selected === undefined) return puzzle === 'pocket' ? stickerAt('F', 0, 0) : stickerAt('F', 1, 1)
+  const from = LAYOUT[stickerFace(selected)]
+  if (from === undefined) throw new RangeError(`Stickers on face ${stickerFace(selected)} can't be selected`)
+  const [dc, dr] = STEPS[direction]
+  let col = from.col + stickerCol(selected)
+  let row = from.row + stickerRow(selected)
+  // Step one cell at a time the way the arrow points, passing over Phantom
+  // Stickers, until the next Live Sticker or the outside edge, where the
+  // selection stays where it was.
+  for (;;) {
+    col += dc
+    row += dr
+    const next = stickerAtGrid(col, row)
+    if (next === undefined) return selected
+    if (isLiveSticker(puzzle, next)) return next
+  }
 }

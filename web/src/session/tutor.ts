@@ -214,9 +214,10 @@ export class Tutor {
       return
     }
     // The Snapshot carries its own puzzle, which may differ from the one the
-    // Tutor opened on: the queue now applies later Moves as that puzzle does.
+    // Tutor opened on: the queue now applies later Moves as that puzzle does,
+    // and a selection the new puzzle can't show is dropped.
     this.queue.jump(session.cube, session.puzzle)
-    this.#update({ session, opening: undefined, scrambling: false, hint: undefined })
+    this.#update({ session, selected: this.#selectionFor(session.puzzle), opening: undefined, scrambling: false, hint: undefined })
   }
 
   /**
@@ -255,15 +256,21 @@ export class Tutor {
     if (this.#state.confirming === 'new-scramble') this.#update({ confirming: undefined })
   }
 
-  /** Selects a Sticker on the front, right or top face; ignores any other. */
+  /**
+   * Selects a Live Sticker on the front, right or top face; ignores any other,
+   * including a Pocket Cube's Phantom Stickers (its edges and center).
+   */
   select(sticker: Sticker): void {
-    if (!isSelectable(sticker)) return
+    if (!isSelectable(sticker, this.#state.session.puzzle)) return
     this.#update({ selected: sticker, hint: undefined })
   }
 
-  /** Moves the selection to the next Sticker one way, or selects the front face's center. */
+  /**
+   * Moves the selection to the next Sticker one way, or selects the front
+   * face's center — its top-left corner on a Pocket Cube, which has no center.
+   */
   stepSelection(direction: Direction): void {
-    this.select(stepSelection(this.#state.selected, direction))
+    this.select(stepSelection(this.#state.selected, direction, this.#state.session.puzzle))
   }
 
   clearSelection(): void {
@@ -564,6 +571,9 @@ export class Tutor {
     const session = Session.start(scramble, puzzle)
     const changes = {
       session,
+      // Switching Puzzle can leave a selection the new one doesn't show (a 3x3
+      // center is a Pocket Cube Phantom Sticker), so drop one it can't select.
+      selected: this.#selectionFor(puzzle),
       hint: undefined,
       confirming: undefined,
       solveStatus: this.#settledSolveStatus(),
@@ -577,6 +587,13 @@ export class Tutor {
     this.queue.jump(Cube.solved(), puzzle)
     for (const move of session.scramble) this.queue.enqueue(move, SCRAMBLE_TURN_MS)
     this.#update({ ...changes, scrambling: true })
+  }
+
+  // The current selection kept only if the Puzzle can still show it, so a
+  // Puzzle switch never leaves a Phantom Sticker selected.
+  #selectionFor(puzzle: Puzzle): Sticker | undefined {
+    const { selected } = this.#state
+    return selected !== undefined && isSelectable(selected, puzzle) ? selected : undefined
   }
 
   #client(): SnapshotClient {
